@@ -8,8 +8,9 @@ import javax.swing.JFrame;
 public class GUI extends JComponent {
 
 	private static final long serialVersionUID = -8900010760721989010L;
-	double[][] coeffs;// = new double[][] { { 0.5, 0, 0, 0, 0.5, 0 }, { 0.5, 0, 0.5, 0, 0.5, 0 }, { 0.5, 0, 0, 0, 0.5, 0.5 } };
-	double[][] postCoeffs;
+	double[][] coeffs;// = new double[][] { { 0.5, 0, 0, 0, 0.5, 0 }, { 0.5, 0, 0.5, 0, 0.5, 0 }, { 0.5, 0, 0, 0, 0.5, 0.5 }, { 1, 0, 0, 0, 1, 0 } };
+	double[][] postCoeffs;// = new double[][] { { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 } };
+	double[][] funcColors;// = new double[][] { { 0, 1, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, { 0.5, 0.5, 0.5 } };
 	int numIter = 1000000;
 	Random rand = new Random();
 	Variation[] variations;
@@ -17,16 +18,27 @@ public class GUI extends JComponent {
 	int count;
 
 	public GUI() {
-		coeffs= new double[rand.nextInt(10)+2][6];
-		postCoeffs= new double[coeffs.length][6];
-		for(int i=0;i<coeffs.length;i++){
-			for(int j=0;j<6;j++){
-				coeffs[i][j] = rand.nextDouble();
-				postCoeffs[i][j] = rand.nextDouble();
+		long seed = rand.nextLong();
+		rand.setSeed(seed);
+		System.out.println("Seed: " + seed);
+		coeffs = new double[rand.nextInt(10) + 2][6];
+		postCoeffs = new double[coeffs.length][6];
+		funcColors = new double[coeffs.length][3];
+		for (int i = 0; i < coeffs.length; i++) {
+			for (int j = 0; j < 6; j++) {
+				coeffs[i][j] = rand.nextGaussian();
+				postCoeffs[i][j] = rand.nextGaussian();
+				if (j < funcColors[i].length) {
+					funcColors[i][j] = rand.nextDouble();
+				}
 			}
 		}
+//		for (int i = 0; i < coeffs.length; i++) {
+//			System.out.printf("%.2fx + %.2fy + %.2f\n", coeffs[i][0], coeffs[i][1], coeffs[i][2]);
+//			System.out.printf("%.2fx + %.2fy + %.2f\n\n", coeffs[i][3], coeffs[i][4], coeffs[i][5]);
+//		}
 		initVariations();
-		JFrame frame = new JFrame("Chaos Game");
+		JFrame frame = new JFrame("Chaos Game " + seed);
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setSize(1024, 768);
 		frame.getContentPane().add(this);
@@ -38,49 +50,76 @@ public class GUI extends JComponent {
 	}
 
 	public void paint(Graphics g) {
-		count=0;
+		count = 0;
 		int width = this.getWidth();
 		int height = this.getHeight();
 
-		g.setColor(Color.WHITE);
+		g.setColor(Color.BLACK);
 		g.fillRect(0, 0, width, height);
 
 		int[][] data = new int[width][height];
+		double[][][] colors = new double[width][height][4];
 
-		double[] p = new double[] { rand.nextDouble(), rand.nextDouble() }, newp = new double[2], totalp = new double[2];
+		double[] p = new double[] { rand.nextDouble(), rand.nextDouble() }, newp = new double[2], totalp = new double[2], col = new double[] {
+				rand.nextDouble(), rand.nextDouble(), rand.nextDouble() };
 		for (int i = 0; i < 20; i++) {
-			int f = rand.nextInt(coeffs.length-1);
+			int f = rand.nextInt(coeffs.length - 1);
 			F(f, p, newp, totalp);
-			F(coeffs.length-1, p, newp, totalp);
+			col[0] = (col[0] + funcColors[f][0]) / 2.0;
+			col[1] = (col[1] + funcColors[f][1]) / 2.0;
+			col[2] = (col[2] + funcColors[f][2]) / 2.0;
+
+			f = coeffs.length - 1;
+			F(f, p, newp, totalp);
+			col[0] = (col[0] + funcColors[f][0]) / 2.0;
+			col[1] = (col[1] + funcColors[f][1]) / 2.0;
+			col[2] = (col[2] + funcColors[f][2]) / 2.0;
 		}
 
 		for (int i = 0; i < numIter; i++) {
-			int f = rand.nextInt(coeffs.length-1);
+			int f = rand.nextInt(coeffs.length - 1);
 			F(f, p, newp, totalp);
-			
-			F(coeffs.length-1, p, newp, totalp);
-	
-			if(!(p[0] > 2 || p[0] < -2 || p[1] > 2 || p[1]< -2)){
-				count++;
-				data[(int) (p[0] * width/4 + width/2)][(int) (p[1] * height/4 + height/2)]++;
+			col[0] = (col[0] + funcColors[f][0]) / 2.0;
+			col[1] = (col[1] + funcColors[f][1]) / 2.0;
+			col[2] = (col[2] + funcColors[f][2]) / 2.0;
+
+			f = coeffs.length - 1;
+			F(f, p, newp, totalp);
+			col[0] = (col[0] + funcColors[f][0]) / 2.0;
+			col[1] = (col[1] + funcColors[f][1]) / 2.0;
+			col[2] = (col[2] + funcColors[f][2]) / 2.0;
+
+			if (!(p[0] > 2 || p[0] < -2 || p[1] > 2 || p[1] < -2)) {
+				int x = (int) (p[0] * width / 4 + width / 2);
+				int y = (int) (p[1] * height / 4 + height / 2);
+				data[x][y]++;
+				colors[x][y][0] += col[0];
+				colors[x][y][1] += col[1];
+				colors[x][y][2] += col[2];
+				colors[x][y][3]++;
 			}
 		}
 
-		
-		
-		
-		g.setColor(Color.BLACK);
 		for (int i = 0; i < width; i++) {
 			for (int j = 0; j < height; j++) {
 				if (data[i][j] != 0) {
-					g.fillRect(i, j,10, 10);
+					count++;
+					double alpha = Math.log(colors[i][j][3]) / colors[i][j][3];
+					float r = (float) (alpha * colors[i][j][0]);
+					float gr = (float) (alpha * colors[i][j][1]);
+					float b = (float) (alpha * colors[i][j][2]);
+					r = Math.min(r, 1);
+					gr = Math.min(gr, 1);
+					b = Math.min(b, 1);
+					g.setColor(new Color(r, gr, b));
+					g.fillRect(i, j, 1, 1);
 				}
 			}
 		}
 		System.out.println("Painted " + count);
 	}
-	
-	public void F(int f, double[] p, double[] newp, double[] totalp){
+
+	public void F(int f, double[] p, double[] newp, double[] totalp) {
 		newp[0] = coeffs[f][0] * p[0] + coeffs[f][1] * p[1] + coeffs[f][2];
 		newp[1] = coeffs[f][3] * p[0] + coeffs[f][4] * p[1] + coeffs[f][5];
 		p[0] = newp[0];
@@ -89,18 +128,20 @@ public class GUI extends JComponent {
 		// Apply ALL the variations with their respective weights
 		totalp[0] = 0;
 		totalp[1] = 0;
-		double r = Math.sqrt(p[0]*p[0]+p[1]*p[1]);
-		double theta = Math.atan(p[0]/p[1]);
-		double phi = Math.atan(p[1]/p[0]);
-		for(int v=0;v<variations.length;v++){
-			variations[v].f(p, newp, coeffs[f], r, theta, phi, rand);
-			totalp[0] += newp[0]*varWeights[v];
-			totalp[1] += newp[1]*varWeights[v];
+		double r = Math.sqrt(p[0] * p[0] + p[1] * p[1]);
+		double theta = Math.atan(p[0] / p[1]);
+		double phi = Math.atan(p[1] / p[0]);
+		for (int v = 0; v < variations.length; v++) {
+			if (Double.compare(varWeights[v], 0) != 0) {
+				variations[v].f(p, newp, coeffs[f], r, theta, phi, rand);
+				totalp[0] += newp[0] * varWeights[v];
+				totalp[1] += newp[1] * varWeights[v];
+			}
 		}
 		p[0] = totalp[0];
 		p[1] = totalp[1];
-		
-		//Post transform
+
+		// Post transform
 		newp[0] = postCoeffs[f][0] * p[0] + postCoeffs[f][1] * p[1] + postCoeffs[f][2];
 		newp[1] = postCoeffs[f][3] * p[0] + postCoeffs[f][4] * p[1] + postCoeffs[f][5];
 		p[0] = newp[0];
@@ -133,8 +174,8 @@ public class GUI extends JComponent {
 		variations[20] = new Variation.Cosine();
 		variations[21] = new Variation.Rings();
 		variations[22] = new Variation.Fan();
-		variations[23] = new Variation.Blob(rand.nextDouble(),rand.nextDouble(), rand.nextDouble());
-		variations[24] = new Variation.PDJ(rand.nextDouble(),rand.nextDouble(),rand.nextDouble(),rand.nextDouble());
+		variations[23] = new Variation.Blob(rand.nextDouble(), rand.nextDouble(), rand.nextDouble());
+		variations[24] = new Variation.PDJ(rand.nextDouble(), rand.nextDouble(), rand.nextDouble(), rand.nextDouble());
 		variations[25] = new Variation.Fan2();
 		variations[26] = new Variation.Rings2();
 		variations[27] = new Variation.Eyefish();
@@ -163,14 +204,17 @@ public class GUI extends JComponent {
 		// Normalise all the weights
 		double total = 0;
 		for (int i = 0; i < variations.length; i++) {
-			varWeights[i] = rand.nextDouble()+0.1;
-			total += varWeights[i];
+			if (Double.compare(rand.nextDouble(), 0.03) < 0) {
+				varWeights[i] = rand.nextDouble() + 0.1;
+				total += varWeights[i];
+			} else {
+				varWeights[i] = 0;
+			}
 		}
 		for (int i = 0; i < variations.length; i++) {
 			varWeights[i] /= total;
 		}
 
 	}
-	
-	
+
 }
