@@ -1,7 +1,5 @@
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.ComponentOrientation;
-import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.util.Random;
 
@@ -14,13 +12,15 @@ import javax.swing.JSlider;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
-public class GUI extends JComponent{
+public class GUI extends JComponent {
 
 	private static final long serialVersionUID = -8900010760721989010L;
-	double[][] coeffs;// = new double[][] { { 0.5, 0, 0, 0, 0.5, 0 }, { 0.5, 0, 0.5, 0, 0.5, 0 }, { 0.5, 0, 0, 0, 0.5, 0.5 }, { 1, 0, 0, 0, 1, 0 } };
-	double[][] postCoeffs;// = new double[][] { { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 } };
+	double[][] coeffs;// = new double[][] { { 0.5, 0, 0, 0, 0.5, 0 }, { 0.5, 0, 0.5, 0, 0.5, 0 }, { 0.5, 0, 0, 0, 0.5,
+						// 0.5 }, { 1, 0, 0, 0, 1, 0 } };
+	double[][] postCoeffs;// = new double[][] { { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 }, { 1, 0, 0, 0, 1, 0 }, { 1,
+							// 0, 0, 0, 1, 0 } };
 	double[][] funcColors;// = new double[][] { { 0, 1, 0 }, { 1, 0, 0 }, { 0, 0, 1 }, { 0.5, 0.5, 0.5 } };
-	long numIter = 1000000;
+	long numIter = 100000;
 	Random rand = new Random();
 	Variation[] variations;
 	double[] varWeights;
@@ -28,6 +28,11 @@ public class GUI extends JComponent{
 	boolean run;
 	boolean done;
 	int zoom = 1;
+	boolean useOld = false;
+	double gamma = 4;
+	int[][] data;
+	double[][][] colors;
+	int superSampleSize;
 
 	public GUI() {
 		long seed = rand.nextLong();
@@ -54,41 +59,60 @@ public class GUI extends JComponent{
 		frame.getContentPane().setLayout(new BorderLayout());
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.setSize(1024, 768);
-		frame.getContentPane().add(this,BorderLayout.CENTER);
-		
+		frame.getContentPane().add(this, BorderLayout.CENTER);
 
 		JPanel mainPanel = new JPanel();
-		mainPanel.setLayout(new BoxLayout(mainPanel,BoxLayout.PAGE_AXIS));
-		
-		//ZOOM
+		mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.PAGE_AXIS));
+
+		// Iterations
 		JPanel panel = new JPanel();
-		JSlider slider = new JSlider(4,10,6);
-		slider.addChangeListener(new ChangeListener(){	
+		JSlider slider = new JSlider(4, 10, 5);
+		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
-			numIter = (long) Math.pow(10, ((JSlider)e.getSource()).getValue());
-			repaint();
-		}});
+				numIter = (long) Math.pow(10, ((JSlider) e.getSource()).getValue());
+				useOld = false;
+				repaint();
+			}
+		});
 		panel.setLayout(new BorderLayout());
-		panel.add(slider,BorderLayout.CENTER);
+		panel.add(slider, BorderLayout.CENTER);
 		panel.add(new JLabel("Iterations"), BorderLayout.WEST);
 		mainPanel.add(panel);
-		
-		//Iterations
+
+		// Zoom
 		panel = new JPanel();
-		slider = new JSlider(1,10,1);
-		slider.addChangeListener(new ChangeListener(){	
+		slider = new JSlider(1, 10, 1);
+		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
-			zoom = ((JSlider)e.getSource()).getValue();
-			repaint();
-		}});
+				zoom = ((JSlider) e.getSource()).getValue();
+				useOld = false;
+				repaint();
+			}
+		});
 		panel.setLayout(new BorderLayout());
-		panel.add(slider,BorderLayout.CENTER);
+		panel.add(slider, BorderLayout.CENTER);
 		panel.add(new JLabel("Zoom"), BorderLayout.WEST);
 		mainPanel.add(panel);
-		
-		frame.getContentPane().add(mainPanel,BorderLayout.SOUTH);
+
+		// Gamma
+		panel = new JPanel();
+		slider = new JSlider(1, 100, (int) (gamma * 10));
+		slider.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				gamma = ((JSlider) e.getSource()).getValue() / 10.0;
+				useOld = true;
+				repaint();
+			}
+		});
+		panel.setLayout(new BorderLayout());
+		panel.add(slider, BorderLayout.CENTER);
+		panel.add(new JLabel("Gamma"), BorderLayout.WEST);
+		mainPanel.add(panel);
+
+		frame.getContentPane().add(mainPanel, BorderLayout.SOUTH);
 		frame.setVisible(true);
 
 		while (true) {
@@ -120,9 +144,10 @@ public class GUI extends JComponent{
 				// }
 				initVariations();
 				done = false;
+				useOld = false;
 				this.repaint();
-				
-			}else{
+
+			} else {
 				return;
 			}
 		}
@@ -142,61 +167,78 @@ public class GUI extends JComponent{
 		g.setColor(Color.BLACK);
 		g.fillRect(0, 0, width, height);
 
-		int[][] data = new int[width][height];
-		double[][][] colors = new double[width][height][4];
-
-		double[] p = new double[] { rand.nextDouble(), rand.nextDouble() }, newp = new double[2], totalp = new double[2], col = new double[] {
-				rand.nextDouble(), rand.nextDouble(), rand.nextDouble() };
-		for (int i = 0; i < 20; i++) {
-			int f = rand.nextInt(coeffs.length - 1);
-			F(f, p, newp, totalp);
-			col[0] = (col[0] + funcColors[f][0]) / 2.0;
-			col[1] = (col[1] + funcColors[f][1]) / 2.0;
-			col[2] = (col[2] + funcColors[f][2]) / 2.0;
-
-			f = coeffs.length - 1;
-			F(f, p, newp, totalp);
-			col[0] = (col[0] + funcColors[f][0]) / 2.0;
-			col[1] = (col[1] + funcColors[f][1]) / 2.0;
-			col[2] = (col[2] + funcColors[f][2]) / 2.0;
-		}
-
-		for (int i = 0; i < numIter; i++) {
-			int f = rand.nextInt(coeffs.length - 1);
-			F(f, p, newp, totalp);
-			col[0] = (col[0] + funcColors[f][0]) / 2.0;
-			col[1] = (col[1] + funcColors[f][1]) / 2.0;
-			col[2] = (col[2] + funcColors[f][2]) / 2.0;
-
-			f = coeffs.length - 1;
-			F(f, p, newp, totalp);
-			col[0] = (col[0] + funcColors[f][0]) / 2.0;
-			col[1] = (col[1] + funcColors[f][1]) / 2.0;
-			col[2] = (col[2] + funcColors[f][2]) / 2.0;
-
-			if (!(p[0] > zoom || p[0] < -zoom || p[1] > zoom || p[1] < -zoom)) {
-				int x = (int) (p[0] * width / (zoom*2) + width / 2);
-				int y = (int) (p[1] * height / (zoom*2) + height / 2);
-				data[x][y]++;
-				colors[x][y][0] += col[0];
-				colors[x][y][1] += col[1];
-				colors[x][y][2] += col[2];
-				colors[x][y][3]++;
+		if (!useOld) {
+			if(data == null) {
+				data = new int[width][height];
+				colors = new double[width][height][4];
+			}else{
+				for(int i  =0 ;i < width;i++){
+					for(int j =0; j < height;j++){
+						data[i][j]=0;
+						for(int k=0;k<4;k++){
+							colors[i][j][k]=0;
+						}
+					}
+				}
 			}
-		}
 
+			double[] p = new double[] { rand.nextDouble(), rand.nextDouble() }, newp = new double[2], totalp = new double[2], col = new double[] {
+					rand.nextDouble(), rand.nextDouble(), rand.nextDouble() };
+			for (int i = 0; i < 20; i++) {
+				int f = rand.nextInt(coeffs.length - 1);
+				F(f, p, newp, totalp);
+				col[0] = (col[0] + funcColors[f][0]) / 2.0;
+				col[1] = (col[1] + funcColors[f][1]) / 2.0;
+				col[2] = (col[2] + funcColors[f][2]) / 2.0;
+
+				f = coeffs.length - 1;
+				F(f, p, newp, totalp);
+				col[0] = (col[0] + funcColors[f][0]) / 2.0;
+				col[1] = (col[1] + funcColors[f][1]) / 2.0;
+				col[2] = (col[2] + funcColors[f][2]) / 2.0;
+			}
+
+			for (int i = 0; i < numIter; i++) {
+				int f = rand.nextInt(coeffs.length - 1);
+				F(f, p, newp, totalp);
+				col[0] = (col[0] + funcColors[f][0]) / 2.0;
+				col[1] = (col[1] + funcColors[f][1]) / 2.0;
+				col[2] = (col[2] + funcColors[f][2]) / 2.0;
+
+				f = coeffs.length - 1;
+				F(f, p, newp, totalp);
+				col[0] = (col[0] + funcColors[f][0]) / 2.0;
+				col[1] = (col[1] + funcColors[f][1]) / 2.0;
+				col[2] = (col[2] + funcColors[f][2]) / 2.0;
+
+				if (!(p[0] > zoom || p[0] < -zoom || p[1] > zoom || p[1] < -zoom)) {
+					int x = (int) (p[0] * width / (zoom * 2) + width / 2);
+					int y = (int) (p[1] * height / (zoom * 2) + height / 2);
+					data[x][y]++;
+					colors[x][y][0] += col[0];
+					colors[x][y][1] += col[1];
+					colors[x][y][2] += col[2];
+					colors[x][y][3]++;
+				}
+			}
+			useOld = true;
+		}
 		for (int i = 0; i < width; i++) {
 			for (int j = 0; j < height; j++) {
 				if (data[i][j] != 0) {
 					count++;
 					double alpha = Math.log(colors[i][j][3]) / colors[i][j][3];
-					float r = (float) (alpha * colors[i][j][0]);
-					float gr = (float) (alpha * colors[i][j][1]);
+					float h = (float) (alpha * colors[i][j][0]);
+					float s = (float) (alpha * colors[i][j][1]);
 					float b = (float) (alpha * colors[i][j][2]);
-					r = Math.min(r, 1);
-					gr = Math.min(gr, 1);
+					h = (float) Math.pow(h, gamma);
+					s = (float) Math.pow(s, gamma);
+					b = (float) Math.pow(b, gamma);
+					h = Math.min(h, 1);
+					s = Math.min(s, 1);
 					b = Math.min(b, 1);
-					g.setColor(new Color(r, gr, b));
+					g.setColor(new Color(h, s, b));
+					// g.setColor(new Color(Color.HSBtoRG(h, s, b)));
 					g.fillRect(i, j, 1, 1);
 				}
 			}
@@ -295,9 +337,10 @@ public class GUI extends JComponent{
 		variations[35] = new Variation.Gaussian();
 		variations[36] = new Variation.RadialBlur(rand.nextDouble() * Math.PI * 2, varWeights[36]);
 		variations[37] = new Variation.Pie(rand.nextInt(10), rand.nextDouble() * Math.PI * 2, rand.nextDouble());
-		variations[38] = new Variation.Ngon(rand.nextDouble()*5,rand.nextInt(10),rand.nextInt(12),rand.nextGaussian());
-		variations[39] = new Variation.Curl(rand.nextGaussian(),rand.nextGaussian());
-		variations[40] = new Variation.Rectangles(rand.nextGaussian(),rand.nextGaussian());
+		variations[38] = new Variation.Ngon(rand.nextDouble() * 5, rand.nextInt(10), rand.nextInt(12),
+				rand.nextGaussian());
+		variations[39] = new Variation.Curl(rand.nextGaussian(), rand.nextGaussian());
+		variations[40] = new Variation.Rectangles(rand.nextGaussian(), rand.nextGaussian());
 		variations[41] = new Variation.Arch(varWeights[41]);
 		variations[42] = new Variation.Tangent();
 		variations[43] = new Variation.Square();
@@ -308,7 +351,5 @@ public class GUI extends JComponent{
 		variations[48] = new Variation.Cross();
 
 	}
-
-
 
 }
