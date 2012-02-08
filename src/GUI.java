@@ -167,13 +167,15 @@ public class GUI extends JComponent {
 		g.setColor(Color.BLACK);
 		g.fillRect(0, 0, width, height);
 
+		int h = height * superSampleSize;
+		int w = width * superSampleSize;
 		if (!useOld) {
 			if(data == null) {
-				data = new int[width][height];
-				colors = new double[width][height][4];
+				data = new int[w][h];
+				colors = new double[w][h][4];
 			}else{
-				for(int i  =0 ;i < width;i++){
-					for(int j =0; j < height;j++){
+				for(int i  =0 ;i < w;i++){
+					for(int j =0; j < h;j++){
 						data[i][j]=0;
 						for(int k=0;k<4;k++){
 							colors[i][j][k]=0;
@@ -212,8 +214,8 @@ public class GUI extends JComponent {
 				col[2] = (col[2] + funcColors[f][2]) / 2.0;
 
 				if (!(p[0] > zoom || p[0] < -zoom || p[1] > zoom || p[1] < -zoom)) {
-					int x = (int) (p[0] * width / (zoom * 2) + width / 2);
-					int y = (int) (p[1] * height / (zoom * 2) + height / 2);
+					int x = (int) (p[0] * w / (zoom * 2) + w / 2);
+					int y = (int) (p[1] * h / (zoom * 2) + h / 2);
 					data[x][y]++;
 					colors[x][y][0] += col[0];
 					colors[x][y][1] += col[1];
@@ -228,17 +230,16 @@ public class GUI extends JComponent {
 				if (data[i][j] != 0) {
 					count++;
 					double alpha = Math.log(colors[i][j][3]) / colors[i][j][3];
-					float h = (float) (alpha * colors[i][j][0]);
-					float s = (float) (alpha * colors[i][j][1]);
+					float r = (float) (alpha * colors[i][j][0]);
+					float gr = (float) (alpha * colors[i][j][1]);
 					float b = (float) (alpha * colors[i][j][2]);
-					h = (float) Math.pow(h, gamma);
-					s = (float) Math.pow(s, gamma);
+					r = (float) Math.pow(r, gamma);
+					gr = (float) Math.pow(gr, gamma);
 					b = (float) Math.pow(b, gamma);
-					h = Math.min(h, 1);
-					s = Math.min(s, 1);
+					r= Math.min(r, 1);
+					gr = Math.min(gr, 1);
 					b = Math.min(b, 1);
-					g.setColor(new Color(h, s, b));
-					// g.setColor(new Color(Color.HSBtoRG(h, s, b)));
+					g.setColor(new Color(r, gr, b));
 					g.fillRect(i, j, 1, 1);
 				}
 			}
