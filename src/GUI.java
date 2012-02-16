@@ -32,7 +32,7 @@ public class GUI extends JComponent {
 	double gamma = 4;
 	int[][] data;
 	double[][][] colors;
-	int superSampleSize;
+	int superSampleSize = 3;
 
 	public GUI() {
 		long seed = rand.nextLong();
@@ -169,16 +169,16 @@ public class GUI extends JComponent {
 
 		int h = height * superSampleSize;
 		int w = width * superSampleSize;
-		if (!useOld) {
-			if(data == null) {
+		if (!useOld || data.length != w || data[0].length != h) {
+			if (data == null || data.length != w || data[0].length != h) {
 				data = new int[w][h];
 				colors = new double[w][h][4];
-			}else{
-				for(int i  =0 ;i < w;i++){
-					for(int j =0; j < h;j++){
-						data[i][j]=0;
-						for(int k=0;k<4;k++){
-							colors[i][j][k]=0;
+			} else {
+				for (int i = 0; i < w; i++) {
+					for (int j = 0; j < h; j++) {
+						data[i][j] = 0;
+						for (int k = 0; k < 4; k++) {
+							colors[i][j][k] = 0;
 						}
 					}
 				}
@@ -186,7 +186,7 @@ public class GUI extends JComponent {
 
 			double[] p = new double[] { rand.nextDouble(), rand.nextDouble() }, newp = new double[2], totalp = new double[2], col = new double[] {
 					rand.nextDouble(), rand.nextDouble(), rand.nextDouble() };
-			for (int i = 0; i < 20; i++) {
+			for (int i = 0; i < 20 && useOld; i++) {
 				int f = rand.nextInt(coeffs.length - 1);
 				F(f, p, newp, totalp);
 				col[0] = (col[0] + funcColors[f][0]) / 2.0;
@@ -200,7 +200,7 @@ public class GUI extends JComponent {
 				col[2] = (col[2] + funcColors[f][2]) / 2.0;
 			}
 
-			for (int i = 0; i < numIter; i++) {
+			for (int i = 0; i < numIter && !useOld; i++) {
 				int f = rand.nextInt(coeffs.length - 1);
 				F(f, p, newp, totalp);
 				col[0] = (col[0] + funcColors[f][0]) / 2.0;
@@ -225,22 +225,42 @@ public class GUI extends JComponent {
 			}
 			useOld = true;
 		}
-		for (int i = 0; i < width; i++) {
-			for (int j = 0; j < height; j++) {
-				if (data[i][j] != 0) {
+
+		int ss = superSampleSize / 2, c=0;;
+		boolean draw;
+		for (int i = superSampleSize / 2; i < w; i += superSampleSize) {
+			for (int j = superSampleSize / 2; j < h; j += superSampleSize) {
+				float rt = 0, gt = 0, bt = 0;
+				draw = false;
+				c=0;
+				for (int x = i - ss; x <= i + ss; x++) {
+					for (int y = j - ss; y <= j + ss; y++) {
+						if (data[x][y] != 0) {
+							draw = true;
+							double alpha = Math.log(colors[x][y][3]) / colors[x][y][3];
+							float r = (float) (alpha * colors[x][y][0]);
+							float gr = (float) (alpha * colors[x][y][1]);
+							float b = (float) (alpha * colors[x][y][2]);
+							r = (float) Math.pow(r, gamma);
+							gr = (float) Math.pow(gr, gamma);
+							b = (float) Math.pow(b, gamma);
+							r = Math.min(r, 1);
+							gr = Math.min(gr, 1);
+							b = Math.min(b, 1);
+							rt += r;
+							gt += gr;
+							bt += b;
+							c++;
+						}
+					}
+				}
+				rt/=c;
+				gt/=c;
+				bt/=c;
+				if (draw) {
 					count++;
-					double alpha = Math.log(colors[i][j][3]) / colors[i][j][3];
-					float r = (float) (alpha * colors[i][j][0]);
-					float gr = (float) (alpha * colors[i][j][1]);
-					float b = (float) (alpha * colors[i][j][2]);
-					r = (float) Math.pow(r, gamma);
-					gr = (float) Math.pow(gr, gamma);
-					b = (float) Math.pow(b, gamma);
-					r= Math.min(r, 1);
-					gr = Math.min(gr, 1);
-					b = Math.min(b, 1);
-					g.setColor(new Color(r, gr, b));
-					g.fillRect(i, j, 1, 1);
+					g.setColor(new Color(rt, gt, bt));
+					g.fillRect(i/superSampleSize, j/superSampleSize, 1, 1);
 				}
 			}
 		}
@@ -338,8 +358,7 @@ public class GUI extends JComponent {
 		variations[35] = new Variation.Gaussian();
 		variations[36] = new Variation.RadialBlur(rand.nextDouble() * Math.PI * 2, varWeights[36]);
 		variations[37] = new Variation.Pie(rand.nextInt(10), rand.nextDouble() * Math.PI * 2, rand.nextDouble());
-		variations[38] = new Variation.Ngon(rand.nextDouble() * 5, rand.nextInt(10), rand.nextInt(12),
-				rand.nextGaussian());
+		variations[38] = new Variation.Ngon(rand.nextDouble() * 5, rand.nextInt(10), rand.nextInt(12), rand.nextGaussian());
 		variations[39] = new Variation.Curl(rand.nextGaussian(), rand.nextGaussian());
 		variations[40] = new Variation.Rectangles(rand.nextGaussian(), rand.nextGaussian());
 		variations[41] = new Variation.Arch(varWeights[41]);
