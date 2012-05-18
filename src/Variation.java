@@ -1,30 +1,33 @@
 import java.util.Random;
 
-public interface Variation {
-	public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand);
-
-	public class Linear implements Variation {
+public abstract class Variation {
+	public abstract void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand);	
+	public String toString()
+	{
+		return this.getClass().getName().substring("variation$".length());
+	}
+	public static  class Linear extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = p[0];
 			newp[1] = p[1];
 		}
 	}
 
-	public class Sinusoidal implements Variation {
+	public static class Sinusoidal extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = Math.sin(p[0]);
 			newp[1] = Math.sin(p[1]);
 		}
 	}
 
-	public class Spherical implements Variation {
+	public static class Spherical extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] *= (1.0 / (r * r));
 			newp[1] *= (1.0 / (r * r));
 		}
 	}
 
-	public class Swirl implements Variation {
+	public static class Swirl extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = p[0] * Math.sin(r * r) - p[0] * Math.cos(r * r);
 			newp[1] = p[0] * Math.cos(r * r) - p[1] * Math.sin(r * r);
@@ -32,35 +35,35 @@ public interface Variation {
 		}
 	}
 
-	public class Horseshoe implements Variation {
+	public static class Horseshoe extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = 1 / r * ((p[0] - p[1]) * (p[0] + p[1]));
 			newp[1] = 2 * p[0] * p[1];
 		}
 	}
 
-	public class Polar implements Variation {
+	public static class Polar extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = theta / Math.PI;
 			newp[1] = r - 1;
 		}
 	}
 
-	public class Handkerchief implements Variation {
+	public static class Handkerchief extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = r * Math.sin(theta + r);
 			newp[1] = r * Math.cos(theta - r);
 		}
 	}
 
-	public class Heart implements Variation {
+	public static class Heart extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = r * Math.sin(theta * r);
 			newp[0] = -r * Math.cos(theta * r);
 		}
 	}
 
-	public class Disc implements Variation {
+	public static class Disc extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double t = theta / Math.PI;
 			newp[0] = t * Math.sin(Math.PI * r);
@@ -68,28 +71,28 @@ public interface Variation {
 		}
 	}
 
-	public class Spiral implements Variation {
+	public static class Spiral extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = (1 / r) * (Math.cos(theta) + Math.sin(r));
 			newp[0] = (1 / r) * (Math.sin(theta) + Math.cos(r));
 		}
 	}
 
-	public class Hyperbolic implements Variation {
+	public static class Hyperbolic extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = Math.sin(theta) / r;
 			newp[1] = r * Math.cos(theta);
 		}
 	}
 
-	public class Diamond implements Variation {
+	public static class Diamond extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = Math.sin(theta) * Math.cos(r);
 			newp[1] = Math.cos(theta) * Math.sin(r);
 		}
 	}
 
-	public class Ex implements Variation {
+	public static class Ex extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double p0 = Math.sin(theta + r);
 			double p1 = Math.cos(theta - r);
@@ -100,7 +103,7 @@ public interface Variation {
 		}
 	}
 
-	public class Julia implements Variation {
+	public static class Julia extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double sqr = Math.sqrt(r);
 			newp[0] = sqr * (Math.cos(theta / 2 + (rand.nextBoolean() ? 0 : Math.PI)));
@@ -108,7 +111,7 @@ public interface Variation {
 		}
 	}
 
-	public class Bent implements Variation {
+	public static class Bent extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			if (p[0] >= 0 && p[1] >= 0) {
 				newp[0] = p[0];
@@ -126,14 +129,14 @@ public interface Variation {
 		}
 	}
 
-	public class Waves implements Variation {
+	public static class Waves extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = p[0] + c[1] * Math.sin(p[1] / (c[2] * c[2]));
 			newp[1] = p[1] + c[4] * Math.sin(p[0] / (c[5] * c[5]));
 		}
 	}
 
-	public class Fisheye implements Variation {
+	public static class Fisheye extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double e = 2.0 / (r + 1.0);
 			newp[0] = e * p[1];
@@ -141,14 +144,14 @@ public interface Variation {
 		}
 	}
 
-	public class Popcorn implements Variation {
+	public static class Popcorn extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = p[0] + c[2] * Math.sin(Math.tan(3 * p[1]));
 			newp[1] = p[1] + c[5] * Math.sin(Math.tan(3 * p[0]));
 		}
 	}
 
-	public class Exponential implements Variation {
+	public static class Exponential extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double e = Math.exp(p[0] - 1);
 			newp[0] = e * Math.cos(Math.PI * p[1]);
@@ -156,7 +159,7 @@ public interface Variation {
 		}
 	}
 
-	public class Power implements Variation {
+	public static class Power extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double e = Math.pow(r, Math.sin(theta));
 			newp[0] = e * Math.cos(theta);
@@ -164,14 +167,14 @@ public interface Variation {
 		}
 	}
 
-	public class Cosine implements Variation {
+	public static class Cosine extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = Math.cos(Math.PI * p[0]) * Math.cosh(p[1]);
 			newp[1] = -Math.sin(Math.PI * p[0]) * Math.sinh(p[1]);
 		}
 	}
 
-	public class Rings implements Variation {
+	public static class Rings extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double e = ((r + c[2] * c[2]) % (2 * c[2] * c[2])) - c[2] * c[2] + r * (1 - c[2] * c[2]);
 			newp[0] = e * Math.cos(theta);
@@ -179,7 +182,7 @@ public interface Variation {
 		}
 	}
 
-	public class Fan implements Variation {
+	public static class Fan extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double t = Math.PI * c[2] * c[2];
 			if ((theta + c[5]) % t > t / 2) {
@@ -192,7 +195,7 @@ public interface Variation {
 		}
 	}
 
-	public class Blob implements Variation {
+	public static class Blob extends Variation {
 		private double high;
 		private double low;
 		private double waves;
@@ -210,7 +213,7 @@ public interface Variation {
 		}
 	}
 
-	public class PDJ implements Variation {
+	public static class PDJ extends Variation {
 		private double p1, p2, p3, p4;
 
 		public PDJ(double a, double b, double c, double d) {
@@ -226,7 +229,7 @@ public interface Variation {
 		}
 	}
 
-	public class Fan2 implements Variation {
+	public static class Fan2 extends Variation {
 		private double p1, p2;
 
 		public Fan2(double x, double y) {
@@ -246,7 +249,7 @@ public interface Variation {
 		}
 	}
 
-	public class Rings2 implements Variation {
+	public static class Rings2 extends Variation {
 		private double v;
 
 		public Rings2(double val) {
@@ -260,7 +263,7 @@ public interface Variation {
 		}
 	}
 
-	public class Eyefish implements Variation {
+	public static class Eyefish extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double t = 2 / (r + 1);
 			newp[0] = t * p[0];
@@ -268,7 +271,7 @@ public interface Variation {
 		}
 	}
 
-	public class Bubble implements Variation {
+	public static class Bubble extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double t = 4 / (r * r + 4);
 			newp[0] = t * p[0];
@@ -276,14 +279,14 @@ public interface Variation {
 		}
 	}
 
-	public class Cylinder implements Variation {
+	public static class Cylinder extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = Math.sin(p[0]);
 			newp[1] = p[1];
 		}
 	}
 
-	public class Perspective implements Variation {
+	public static class Perspective extends Variation {
 		double p1, p2;
 
 		public Perspective(double angle, double dist) {
@@ -298,7 +301,7 @@ public interface Variation {
 		}
 	}
 
-	public class Noise implements Variation {
+	public static class Noise extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double t1 = rand.nextDouble();
 			double t2 = rand.nextDouble();
@@ -307,7 +310,7 @@ public interface Variation {
 		}
 	}
 
-	public class JuliaN implements Variation {
+	public static class JuliaN extends Variation {
 		double p1, p2;
 
 		public JuliaN(double power, double dist) {
@@ -324,7 +327,7 @@ public interface Variation {
 		}
 	}
 
-	public class JuliaScope implements Variation {
+	public static class JuliaScope extends Variation {
 		double p1, p2;
 
 		public JuliaScope(double power, double dist) {
@@ -341,7 +344,7 @@ public interface Variation {
 		}
 	}
 
-	public class Blur implements Variation {
+	public static class Blur extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double psi1 = rand.nextDouble();
 			double psi2 = rand.nextDouble();
@@ -350,7 +353,7 @@ public interface Variation {
 		}
 	}
 
-	public class Gaussian implements Variation {
+	public static class Gaussian extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double psi1 = 0;
 			for (int i = 0; i < 4; i++) {
@@ -362,7 +365,7 @@ public interface Variation {
 		}
 	}
 
-	public class RadialBlur implements Variation {
+	public static class RadialBlur extends Variation {
 		double p1;
 		double v;
 
@@ -385,7 +388,7 @@ public interface Variation {
 		}
 	}
 
-	public class Pie implements Variation {
+	public static class Pie extends Variation {
 		double p1, p2, p3;
 
 		public Pie(int slices, double rotation, double thickness) {
@@ -403,7 +406,7 @@ public interface Variation {
 		}
 	}
 
-	public class Ngon implements Variation {
+	public static class Ngon extends Variation {
 		private double p1, p2, p3, p4;
 
 		public Ngon(double power, int sides, int corners, double circle) {
@@ -427,7 +430,7 @@ public interface Variation {
 		}
 	}
 
-	public class Curl implements Variation {
+	public static class Curl extends Variation {
 		private double p1, p2;
 
 		public Curl(double c1, double c2) {
@@ -444,7 +447,7 @@ public interface Variation {
 		}
 	}
 
-	public class Rectangles implements Variation {
+	public static class Rectangles extends Variation {
 		private double p1, p2;
 
 		public Rectangles(double x, double y) {
@@ -458,7 +461,7 @@ public interface Variation {
 		}
 	}
 
-	public class Arch implements Variation {
+	public static class Arch extends Variation {
 		private double v;
 
 		public Arch(double v41) {
@@ -471,21 +474,21 @@ public interface Variation {
 		}
 	}
 
-	public class Tangent implements Variation {
+	public static class Tangent extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = Math.sin(p[0]) / Math.cos(p[1]);
 			newp[1] = Math.tan(p[1]);
 		}
 	}
 
-	public class Square implements Variation {
+	public static class Square extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			newp[0] = rand.nextDouble() - 0.5;
 			newp[1] = rand.nextDouble() - 0.5;
 		}
 	}
 
-	public class Rays implements Variation {
+	public static class Rays extends Variation {
 		double v;
 
 		public Rays(double v44) {
@@ -499,7 +502,7 @@ public interface Variation {
 		}
 	}
 
-	public class Blade implements Variation {
+	public static class Blade extends Variation {
 		double v;
 
 		public Blade(double v45) {
@@ -512,7 +515,7 @@ public interface Variation {
 		}
 	}
 
-	public class Secant implements Variation {
+	public static class Secant extends Variation {
 		double v;
 
 		public Secant(double v46) {
@@ -525,7 +528,7 @@ public interface Variation {
 		}
 	}
 
-	public class Twintrian implements Variation {
+	public static class Twintrian extends Variation {
 		double v;
 		public Twintrian(double v47){
 			this.v = v47;
@@ -537,7 +540,7 @@ public interface Variation {
 		}
 	}
 
-	public class Cross implements Variation {
+	public static class Cross extends Variation {
 		public void f(double[] p, double[] newp, double[] c, double r, double theta, double phi, Random rand) {
 			double t = p[0]*p[0] + p[1]*p[1];
 			t *=t;

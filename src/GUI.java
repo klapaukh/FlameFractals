@@ -1,14 +1,24 @@
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Graphics;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.awt.event.KeyEvent;
+import java.awt.event.KeyListener;
 import java.util.Random;
 
 import javax.swing.BoxLayout;
+import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
 import javax.swing.JSlider;
+import javax.swing.JTextField;
+import javax.swing.ScrollPaneConstants;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -111,7 +121,60 @@ public class GUI extends JComponent {
 		panel.add(slider, BorderLayout.CENTER);
 		panel.add(new JLabel("Gamma"), BorderLayout.WEST);
 		mainPanel.add(panel);
+		
+		panel = new JPanel();
+		JButton b= new JButton("Redraw");
+		b.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				repaint();
+			}
+		});
+		panel.add(b);
+		mainPanel.add(b);
+		
+		JPanel topPanel = new JPanel();
 
+		for(int i = 0; i< variations.length;i++){
+			JLabel lab = new JLabel(variations[i].toString());
+			final JTextField t = new JTextField(4);
+			final int l = i;
+			
+			t.addKeyListener(new KeyListener(){
+				int slot = l;
+				JTextField f= t;
+				@Override
+				public void keyTyped(KeyEvent e) {
+					// TODO Auto-generated method stub
+					
+				}
+
+				@Override
+				public void keyPressed(KeyEvent e) {
+					// TODO Auto-generated method stub
+					
+				}
+
+				@Override
+				public void keyReleased(KeyEvent e) {
+					try{
+					varWeights[slot] = Double.parseDouble(f.getText());
+					useOld = false;
+					}catch (Exception exp){
+						exp.printStackTrace();
+					}
+				}});
+			
+			t.setText(String.format("%.3f",varWeights[i]));
+			topPanel.add(lab);
+			topPanel.add(t);
+		}
+		
+		JScrollPane scroll = new JScrollPane(topPanel);
+		scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
+		scroll.setPreferredSize(new Dimension(1000,50));
+		
+		frame.getContentPane().add(scroll,BorderLayout.NORTH);
 		frame.getContentPane().add(mainPanel, BorderLayout.SOUTH);
 		frame.setVisible(true);
 
