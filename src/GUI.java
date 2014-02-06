@@ -121,7 +121,7 @@ public class GUI extends JComponent {
 		panel.add(slider, BorderLayout.CENTER);
 		panel.add(new JLabel("Gamma"), BorderLayout.WEST);
 		mainPanel.add(panel);
-		
+
 		panel = new JPanel();
 		JButton b= new JButton("Redraw");
 		b.addActionListener(new ActionListener() {
@@ -132,27 +132,27 @@ public class GUI extends JComponent {
 		});
 		panel.add(b);
 		mainPanel.add(b);
-		
+
 		JPanel topPanel = new JPanel();
 
 		for(int i = 0; i< variations.length;i++){
 			JLabel lab = new JLabel(variations[i].toString());
 			final JTextField t = new JTextField(4);
 			final int l = i;
-			
+
 			t.addKeyListener(new KeyListener(){
 				int slot = l;
 				JTextField f= t;
 				@Override
 				public void keyTyped(KeyEvent e) {
 					// TODO Auto-generated method stub
-					
+
 				}
 
 				@Override
 				public void keyPressed(KeyEvent e) {
 					// TODO Auto-generated method stub
-					
+
 				}
 
 				@Override
@@ -164,16 +164,16 @@ public class GUI extends JComponent {
 						exp.printStackTrace();
 					}
 				}});
-			
+
 			t.setText(String.format("%.3f",varWeights[i]));
 			topPanel.add(lab);
 			topPanel.add(t);
 		}
-		
+
 		JScrollPane scroll = new JScrollPane(topPanel);
 		scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
 		scroll.setPreferredSize(new Dimension(1000,50));
-		
+
 		frame.getContentPane().add(scroll,BorderLayout.NORTH);
 		frame.getContentPane().add(mainPanel, BorderLayout.SOUTH);
 		frame.setVisible(true);
@@ -372,7 +372,7 @@ public class GUI extends JComponent {
 		// Normalise all the weights
 		double total = 0;
 		for (int i = 0; i < variations.length; i++) {
-			if (Double.compare(rand.nextDouble(), 0.03) < 0) {
+			if (Double.compare(rand.nextDouble(), 0.3) < 0) {
 				varWeights[i] = rand.nextDouble() + 0.1;
 				total += varWeights[i];
 			} else {
