@@ -27,6 +27,10 @@ import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.util.Random;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
 
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -34,6 +38,7 @@ import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.JSlider;
 import javax.swing.JTextField;
@@ -52,11 +57,9 @@ public class GUI extends JComponent {
 	private final long initialSeed;
 	private final Random random;
 	
-	// Rendering thread, lock, and recalculate flag.
-	private Thread renderingThread;
-	private Object renderLock = new Object();
-	private boolean pendingRender = false;
-	private boolean renderRecalculate;
+	// Current rendering task and executor.
+	private FutureTask<Long> renderTask;
+	private ExecutorService renderer;
 	
 	// Image buffer.
 	private int bufferWidth = 1024;
@@ -66,15 +69,15 @@ public class GUI extends JComponent {
 	
 	// GUI components.
 	private JButton redrawButton;
+	private JProgressBar progressBar;
+	
+	// Flame functions.
+	private int numFunctions = 6;
+	private FlameFunction[] functions;
 
-	private double[][] coeffs;
-	private double[][] postCoeffs;
-	private double[][] funcColors;
 	private long numIter = 100000;
 	private Variation[] variations;
 	private double[] variationWeights;
-	private int count;
-	private boolean done;
 	private int zoom = 1;
 	private double gamma = 4;
 	private int[][] data;
@@ -92,24 +95,15 @@ public class GUI extends JComponent {
 		random = new Random(seed);
 		System.out.println("[INIT] Initializing Chaos Games with seed " + initialSeed);
 		
-		// Initialize co-efficients, colors, and variations.
-		coeffs = new double[random.nextInt(10) + 2][6];
-		postCoeffs = new double[coeffs.length][6];
-		funcColors = new double[coeffs.length][3];
-		for (int i = 0; i < coeffs.length; i++) {
-			for (int j = 0; j < 6; j++) {
-				coeffs[i][j] = random.nextGaussian();
-				postCoeffs[i][j] = random.nextGaussian();
-				if (j < funcColors[i].length) {
-					funcColors[i][j] = random.nextDouble();
-				}
-			}
-		}
-		initializeVariations();
+		// Initialize variations and functions.
+		initialize();
 
 		// Create image buffer to hold render result before drawing to screen.
 		image = new BufferedImage(bufferWidth, bufferHeight, BufferedImage.TYPE_INT_RGB);
 		graphics = image.createGraphics();
+		
+		// Create new executor to perform rendering in the background.
+		renderer = Executors.newFixedThreadPool(1);
 		
 		// Create GUI.
 		JFrame frame = new JFrame("Chaos Games - " + initialSeed);
@@ -120,15 +114,24 @@ public class GUI extends JComponent {
 		// Create settings panel at the bottom.
 		JPanel mainPanel = new JPanel();
 		mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.PAGE_AXIS));
+		
+		// Add progress bar.
+		progressBar = new JProgressBar(0, 1000);
+		progressBar.setStringPainted(true);
+		mainPanel.add(progressBar);
 
 		// Add slider to control the number of iterations.
 		JPanel panel = new JPanel();
 		JSlider slider = new JSlider(4, 10, 5);
+		slider.setMajorTickSpacing(1);
+		slider.setSnapToTicks(true);
+		slider.setPaintTicks(true);
+		slider.setPaintLabels(true);
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
 				numIter = (long) Math.pow(10, ((JSlider) e.getSource()).getValue());
-				requestRender(true);
+				render(true, false);
 			}
 		});
 		panel.setLayout(new BorderLayout());
@@ -139,11 +142,15 @@ public class GUI extends JComponent {
 		// Add slider to control the zoom level.
 		panel = new JPanel();
 		slider = new JSlider(1, 10, 1);
+		slider.setMajorTickSpacing(1);
+		slider.setSnapToTicks(true);
+		slider.setPaintTicks(true);
+		slider.setPaintLabels(true);
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
 				zoom = ((JSlider) e.getSource()).getValue();
-				requestRender(true);
+				render(true, false);
 			}
 		});
 		panel.setLayout(new BorderLayout());
@@ -154,11 +161,15 @@ public class GUI extends JComponent {
 		// Add slider to control the Gamma.
 		panel = new JPanel();
 		slider = new JSlider(1, 100, (int) (gamma * 10));
+		slider.setMajorTickSpacing(10);
+		slider.setMinorTickSpacing(1);
+		slider.setPaintTicks(true);
+		slider.setPaintLabels(true);
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
 				gamma = ((JSlider) e.getSource()).getValue() / 10.0;
-				requestRender(false);
+				render(false, false);
 			}
 		});
 		panel.setLayout(new BorderLayout());
@@ -171,10 +182,21 @@ public class GUI extends JComponent {
 		redrawButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				requestRender(true);
+				render(true, false);
 			}
 		});
 		mainPanel.add(redrawButton);
+		
+		// Add redraw button.
+		JButton reinitializeButton = new JButton("Reinitialize");
+		reinitializeButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				initialize();
+				render(true, false);
+			}
+		});
+		mainPanel.add(reinitializeButton);
 
 		// Add top panel to set the weights for each variation.
 		JPanel topPanel = new JPanel();
@@ -191,6 +213,7 @@ public class GUI extends JComponent {
 				public void keyReleased(KeyEvent e) {
 					try {
 						variationWeights[slot] = Double.parseDouble(f.getText());
+						initializeVariations();
 					} catch (Exception exp) {
 						exp.printStackTrace();
 					}
@@ -214,201 +237,163 @@ public class GUI extends JComponent {
 		frame.pack();
 		frame.setVisible(true);
 
-		// Start rendering thread.
-		renderingThread = new Thread() {
-			public void run() {
-				while (true) {
-					synchronized (renderLock) {
-						try {
-							// Wait until a render is requested.
-							renderLock.wait();
-							// Clear the pending render flag and perform the render.
-							pendingRender = false;
-							System.out.println("[RENDER] Beginning render...");
-							render(renderRecalculate);
-							System.out.println("[RENDER] Done.");
-							// Paint the rendered image to the screen.
-							repaint();
-						} catch (InterruptedException e) {
-							System.out.println("\n[RENDER] Interrupted.");
-							// The current render has been interrupted because there is a new render pending.
-						}
-					}
-				}
+		// Re-initialize variations and functions until there is a result with more than 10 pixels.
+		while(render(true, true) < 10) {
+			initialize();
+		}
+	}
+	
+	/**
+	 * A task that calculates and renders the flame fractal with the current parameters.
+	 * The task may be interrupted if a new render is requested before the current one has finished.
+	 */
+	private class RenderTask implements Callable<Long> {
+		private boolean recalculate;
+		
+		public RenderTask(boolean recalculate) {
+			this.recalculate = recalculate;
+		}
+		
+		private void checkForInterrupted() throws InterruptedException {
+			if(Thread.currentThread().isInterrupted()) {
+				throw new InterruptedException();
 			}
-			
-			/**
-			 * Checks if there is a a new render pending.
-			 * If there, is throw an exception so the current render stops.
-			 * 
-			 * @throws InterruptedException If there is a new render pending.
-			 */
-			private void checkForPending() throws InterruptedException {
-				if (pendingRender)
-					throw new InterruptedException();
-			}
-			
-			/**
-			 * Calculates and renders the flame fractal.
-			 * 
-			 * This method should periodically call checkForPending() to check
-			 * if there is a new render pending, and if so, abort the current
-			 * render and begin rendering again.
-			 * 
-			 * @param recalculate If the result of the variations should be recalculated.
-			 * @throws InterruptedException If there is a new render pending.
-			 */
-			private void render(boolean recalculate) throws InterruptedException {
-				System.out.print("[RENDER] Preparing for render...");
-				done = false;
-				count = 0;
+		}
+		
+		public Long call() throws InterruptedException {
+			long count = 0;
 
-				// Set the image buffer to all black.
-				graphics.setColor(Color.BLACK);
-				graphics.fillRect(0, 0, bufferWidth, bufferHeight);
+			// Set the image buffer to all black.
+			graphics.setColor(Color.BLACK);
+			graphics.fillRect(0, 0, bufferWidth, bufferHeight);
+			
+			// Reset the progress bar.
+			progressBar.setValue(0);
+			progressBar.setString("Preparing calculations...");
 
-				int h = bufferHeight * superSampleSize;
-				int w = bufferWidth * superSampleSize;
-				if (recalculate || data.length != w || data[0].length != h) {
-					if (data == null || data.length != w || data[0].length != h) {
-						data = new int[w][h];
-						colors = new double[w][h][4];
-					} else {
-						for (int i = 0; i < w; i++) {
-							for (int j = 0; j < h; j++) {
-								checkForPending();
-								data[i][j] = 0;
-								for (int k = 0; k < 4; k++) {
-									colors[i][j][k] = 0;
-								}
+			int h = bufferHeight * superSampleSize;
+			int w = bufferWidth * superSampleSize;
+			if (recalculate || data.length != w || data[0].length != h) {
+				if (data == null || data.length != w || data[0].length != h) {
+					data = new int[w][h];
+					colors = new double[w][h][4];
+				} else {
+					for (int i = 0; i < w; i++) {
+						for (int j = 0; j < h; j++) {
+							data[i][j] = 0;
+							for (int k = 0; k < 4; k++) {
+								colors[i][j][k] = 0;
 							}
 						}
 					}
-
-					double[] p = new double[] {
-						random.nextDouble(), random.nextDouble()
-					};
-					double[] newp = new double[2];
-					double[] totalp = new double[2];
-					double[] col = new double[] {
-						random.nextDouble(), random.nextDouble(), random.nextDouble()
-					};
-					for (int i = 0; i < 20 && !recalculate; i++) {
-						checkForPending();
-						int f = random.nextInt(coeffs.length - 1);
-						applyAll(f, p, newp, totalp);
-						col[0] = (col[0] + funcColors[f][0]) / 2.0;
-						col[1] = (col[1] + funcColors[f][1]) / 2.0;
-						col[2] = (col[2] + funcColors[f][2]) / 2.0;
-
-						f = coeffs.length - 1;
-						applyAll(f, p, newp, totalp);
-						col[0] = (col[0] + funcColors[f][0]) / 2.0;
-						col[1] = (col[1] + funcColors[f][1]) / 2.0;
-						col[2] = (col[2] + funcColors[f][2]) / 2.0;
-					}
-
-					for (int i = 0; i < numIter && recalculate; i++) {
-						checkForPending();
-						System.out.print("\r[RENDER] " + (i+1) + "/" + numIter + " iterations completed.");
-						int f = random.nextInt(coeffs.length - 1);
-						applyAll(f, p, newp, totalp);
-						col[0] = (col[0] + funcColors[f][0]) / 2.0;
-						col[1] = (col[1] + funcColors[f][1]) / 2.0;
-						col[2] = (col[2] + funcColors[f][2]) / 2.0;
-
-						f = coeffs.length - 1;
-						applyAll(f, p, newp, totalp);
-						col[0] = (col[0] + funcColors[f][0]) / 2.0;
-						col[1] = (col[1] + funcColors[f][1]) / 2.0;
-						col[2] = (col[2] + funcColors[f][2]) / 2.0;
-
-						if (!(p[0] > zoom || p[0] < -zoom || p[1] > zoom || p[1] < -zoom)) {
-							int x = (int) (p[0] * w / (zoom * 2) + w / 2);
-							int y = (int) (p[1] * h / (zoom * 2) + h / 2);
-							data[x][y]++;
-							colors[x][y][0] += col[0];
-							colors[x][y][1] += col[1];
-							colors[x][y][2] += col[2];
-							colors[x][y][3]++;
-						}
-					}
-					recalculate = false;
 				}
 
-				int ss = superSampleSize / 2, c = 0;
-				boolean draw;
-				for (int i = superSampleSize / 2; i < w; i += superSampleSize) {
-					for (int j = superSampleSize / 2; j < h; j += superSampleSize) {
-						float rt = 0, gt = 0, bt = 0;
-						draw = false;
-						c = 0;
-						for (int x = i - ss; x <= i + ss; x++) {
-							for (int y = j - ss; y <= j + ss; y++) {
-								checkForPending();
-								if (data[x][y] != 0) {
-									draw = true;
-									double alpha = Math.log(colors[x][y][3]) / colors[x][y][3];
-									float r = (float) (alpha * colors[x][y][0]);
-									float gr = (float) (alpha * colors[x][y][1]);
-									float b = (float) (alpha * colors[x][y][2]);
-									r = (float) Math.pow(r, gamma);
-									gr = (float) Math.pow(gr, gamma);
-									b = (float) Math.pow(b, gamma);
-									r = Math.min(r, 1);
-									gr = Math.min(gr, 1);
-									b = Math.min(b, 1);
-									rt += r;
-									gt += gr;
-									bt += b;
-									c++;
-								}
+				checkForInterrupted();
+				
+				double[] p = new double[] {
+					random.nextDouble(), random.nextDouble()
+				};
+				double[] newp = new double[2];
+				double[] totalp = new double[2];
+				double[] col = new double[] {
+					random.nextDouble(), random.nextDouble(), random.nextDouble()
+				};
+				for (int i = 0; i < 20 && !recalculate; i++) {
+					checkForInterrupted();
+					FlameFunction f = functions[random.nextInt(numFunctions)];
+					applyAll(f, p, newp, totalp);
+					col[0] = (col[0] + (f.color.getRed() / 255.0)) / 2.0;
+					col[1] = (col[1] + (f.color.getGreen() / 255.0)) / 2.0;
+					col[2] = (col[2] + (f.color.getBlue() / 255.0)) / 2.0;
+				}
+				long startTime = System.currentTimeMillis();
+				for (long i = 0; i < numIter && recalculate; i++) {
+					if(numIter % (numIter / 1000) == 0) {
+						progressBar.setValue((int)((i * 1000) / numIter));
+						long soFar = System.currentTimeMillis() - startTime;
+						double perIteration = soFar / (double)i;
+						long remaining = (long)Math.ceil(perIteration * (numIter - i) / 1000);
+						progressBar.setString("Estimated time remaining: " + remaining + " seconds.");
+					}
+					checkForInterrupted();
+					FlameFunction f = functions[random.nextInt(numFunctions)];
+					applyAll(f, p, newp, totalp);
+					col[0] = (col[0] + (f.color.getRed() / 255.0)) / 2.0;
+					col[1] = (col[1] + (f.color.getGreen() / 255.0)) / 2.0;
+					col[2] = (col[2] + (f.color.getBlue() / 255.0)) / 2.0;
+
+					if (!(p[0] > zoom || p[0] < -zoom || p[1] > zoom || p[1] < -zoom)) {
+						int x = (int) (p[0] * w / (zoom * 2) + w / 2);
+						int y = (int) (p[1] * h / (zoom * 2) + h / 2);
+						data[x][y]++;
+						colors[x][y][0] += col[0];
+						colors[x][y][1] += col[1];
+						colors[x][y][2] += col[2];
+						colors[x][y][3]++;
+					}
+				}
+				recalculate = false;
+			}
+
+			progressBar.setString("Rendering...");
+			
+			int ss = superSampleSize / 2, c = 0;
+			boolean draw;
+			for (int i = superSampleSize / 2; i < w; i += superSampleSize) {
+				for (int j = superSampleSize / 2; j < h; j += superSampleSize) {
+					float rt = 0, gt = 0, bt = 0;
+					draw = false;
+					c = 0;
+					for (int x = i - ss; x <= i + ss; x++) {
+						for (int y = j - ss; y <= j + ss; y++) {
+							checkForInterrupted();
+							if (data[x][y] != 0) {
+								draw = true;
+								double alpha = Math.log(colors[x][y][3]) / colors[x][y][3];
+								float r = (float) (alpha * colors[x][y][0]);
+								float gr = (float) (alpha * colors[x][y][1]);
+								float b = (float) (alpha * colors[x][y][2]);
+								r = (float) Math.pow(r, gamma);
+								gr = (float) Math.pow(gr, gamma);
+								b = (float) Math.pow(b, gamma);
+								r = Math.min(r, 1);
+								gr = Math.min(gr, 1);
+								b = Math.min(b, 1);
+								rt += r;
+								gt += gr;
+								bt += b;
+								c++;
 							}
 						}
-						rt /= c;
-						gt /= c;
-						bt /= c;
-						if (draw) {
-							count++;
-							image.setRGB(i / superSampleSize, j / superSampleSize, new Color(rt, gt, bt).getRGB());
-						}
+					}
+					rt /= c;
+					gt /= c;
+					bt /= c;
+					if (draw) {
+						count++;
+						image.setRGB(i / superSampleSize, j / superSampleSize, new Color(rt, gt, bt).getRGB());
 					}
 				}
-				System.out.println("\n[RENDER] Painted " + count + " pixels at zoom level " + zoom);
-				done = true;
 			}
-		};
-		renderingThread.start();
-
-		while (true) {
-			while (!done) {
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-				}
-			}
-			if (count < 10) {
-				seed = random.nextLong();
-				random.setSeed(seed);
-				System.out.println("Seed: " + seed);
-				coeffs = new double[random.nextInt(10) + 2][6];
-				postCoeffs = new double[coeffs.length][6];
-				funcColors = new double[coeffs.length][3];
-				for (int i = 0; i < coeffs.length; i++) {
-					for (int j = 0; j < 6; j++) {
-						coeffs[i][j] = random.nextGaussian();
-						postCoeffs[i][j] = random.nextGaussian();
-						if (j < funcColors[i].length) {
-							funcColors[i][j] = random.nextDouble();
-						}
-					}
-				}
-				initializeVariations();
-				done = false;
-				requestRender(true);
-			} else {
-				return;
-			}
+			progressBar.setValue(1000);
+			progressBar.setString("Rendered " + count + " pixels at zoom level " + zoom);
+			repaint();
+			return count;
+		}
+	}
+	
+	private synchronized long render(boolean recalculate, boolean block) {
+		if(renderTask != null && !renderTask.isDone()) {
+			renderTask.cancel(true);
+		}
+		renderTask = new FutureTask<>(new RenderTask(recalculate));
+		renderer.execute(renderTask);
+		if(!block)
+			return -1;
+		try {
+			return renderTask.get();
+		} catch(Exception e) {
+			return -1;
 		}
 	}
 
@@ -426,27 +411,10 @@ public class GUI extends JComponent {
 	public void paintComponent(Graphics g) {
 		g.drawImage(image, 0, 0, getWidth(), getHeight(), 0, 0, bufferWidth, bufferHeight, null);
 	}
-	
-	/**
-	 * Requests that the flame fractal is re-rendered.
-	 * This may interrupt an existing render.
-	 * 
-	 * @param recalculate If the result of the variations should be recalculated.
-	 */
-	private void requestRender(boolean recalculate) {
-		// Set the pending render flag.
-		pendingRender = true;
-		synchronized (renderLock) {
-			// Set the recalculate flag.
-			renderRecalculate = recalculate;
-			// Notify the rendering thread that a render is pending.
-			renderLock.notify();
-		}
-	}
 
-	public void applyAll(int f, double[] p, double[] newp, double[] totalp) {
-		newp[0] = coeffs[f][0] * p[0] + coeffs[f][1] * p[1] + coeffs[f][2];
-		newp[1] = coeffs[f][3] * p[0] + coeffs[f][4] * p[1] + coeffs[f][5];
+	public void applyAll(FlameFunction f, double[] p, double[] newp, double[] totalp) {
+		newp[0] = f.coefficients[0] * p[0] + f.coefficients[1] * p[1] + f.coefficients[2];
+		newp[1] = f.coefficients[3] * p[0] + f.coefficients[4] * p[1] + f.coefficients[5];
 		p[0] = newp[0];
 		p[1] = newp[1];
 
@@ -461,7 +429,7 @@ public class GUI extends JComponent {
 		for (int v = 0; v < variations.length; v++) {
 			if (Double.compare(variationWeights[v], 0) != 0) {
 				var = true;
-				variations[v].apply(p, newp, coeffs[f], r, theta, phi, random);
+				variations[v].apply(p, newp, f.coefficients, r, theta, phi, random);
 				totalp[0] += newp[0] * variationWeights[v];
 				totalp[1] += newp[1] * variationWeights[v];
 			}
@@ -472,8 +440,8 @@ public class GUI extends JComponent {
 		}
 
 		// Post transform.
-		newp[0] = postCoeffs[f][0] * p[0] + postCoeffs[f][1] * p[1] + postCoeffs[f][2];
-		newp[1] = postCoeffs[f][3] * p[0] + postCoeffs[f][4] * p[1] + postCoeffs[f][5];
+		newp[0] = f.postCoefficients[0] * p[0] + f.postCoefficients[1] * p[1] + f.postCoefficients[2];
+		newp[1] = f.postCoefficients[3] * p[0] + f.postCoefficients[4] * p[1] + f.postCoefficients[5];
 		p[0] = newp[0];
 		p[1] = newp[1];
 	}
@@ -481,8 +449,25 @@ public class GUI extends JComponent {
 	/**
 	 * Initialize all the different variations with random parameters,
 	 * and generate normalized random weights for each variation.
+	 * Then initialize a random number of flame functions with random coefficients.
 	 */
-	public void initializeVariations() {
+	private synchronized void initialize() {
+		initializeVariations();
+		initializeFlameFunctions();
+	}
+	
+	private synchronized void initializeVariations() {
+//		// Create Sierpinski's gasket.
+//		variationWeights = new double[1];
+//		variationWeights[0] = 1.0;
+//		variations = new Variation[1];
+//		variations[0] = new Variation.Linear();
+//		numFunctions = 3;
+//		functions = new FlameFunction[3];
+//		functions[0] = new FlameFunction(new double[] {0.5, 0, 0, 0, 0.5, 0}, new double[] {1, 0, 0, 0, 1, 0}, Color.RED);
+//		functions[1] = new FlameFunction(new double[] {0.5, 0, 0.5, 0, 0.5, 0}, new double[] {1, 0, 0, 0, 1, 0}, Color.GREEN);
+//		functions[2] = new FlameFunction(new double[] {0.5, 0, 0, 0, 0.5, 0.5}, new double[] {1, 0, 0, 0, 1, 0}, Color.BLUE);
+
 		// Normalize all the weights.
 		variationWeights = new double[NUM_VARIATIONS];
 		double total = 0;
@@ -491,7 +476,7 @@ public class GUI extends JComponent {
 				variationWeights[i] = random.nextDouble() + 0.1;
 				total += variationWeights[i];
 			} else {
-				variationWeights[i] = 0;
+				variationWeights[i] = 0.0;
 			}
 		}
 		for (int i = 0; i < NUM_VARIATIONS; i++) {
@@ -549,6 +534,21 @@ public class GUI extends JComponent {
 		variations[46] = new Variation.Secant(variationWeights[46]);
 		variations[47] = new Variation.Twintrian(variationWeights[47]);
 		variations[48] = new Variation.Cross();
+	}
+	
+	private void initializeFlameFunctions() {
+		// Initialize the flame functions.
+		functions = new FlameFunction[numFunctions];
+		for(int i = 0; i < numFunctions; i++) {
+			double[] coefficients = new double[6];
+			double[] postCoefficients = new double[6];
+			for(int j = 0; j < 6; j++) {
+				coefficients[j] = random.nextGaussian();
+				postCoefficients[j] = random.nextGaussian();
+			}
+			Color color = new Color(random.nextInt(256), random.nextInt(256), random.nextInt(256));
+			functions[i] = new FlameFunction(coefficients, postCoefficients, color);
+		}
 	}
 	
 	public static void main(String args[]) {
