@@ -130,8 +130,11 @@ public class GUI extends JComponent {
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
-				numIter = (long) Math.pow(10, ((JSlider) e.getSource()).getValue());
-				render(true, false);
+				long newNumIter = (long) Math.pow(10, ((JSlider) e.getSource()).getValue());
+				if(newNumIter != numIter) {
+					numIter = newNumIter;
+					render(true, false);
+				}
 			}
 		});
 		panel.setLayout(new BorderLayout());
@@ -149,8 +152,11 @@ public class GUI extends JComponent {
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
-				zoom = ((JSlider) e.getSource()).getValue();
-				render(true, false);
+				int newZoom = ((JSlider) e.getSource()).getValue();
+				if(newZoom != zoom) {
+					zoom = newZoom;
+					render(true, false);
+				}
 			}
 		});
 		panel.setLayout(new BorderLayout());
