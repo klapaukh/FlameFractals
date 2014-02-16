@@ -50,9 +50,11 @@ public class GUI extends JComponent {
 
 	private static final long serialVersionUID = -8900010760721989010L;
 	
-	// Number of variations.
+	// Variations and weights.
 	private static final int NUM_VARIATIONS = 49;
-	
+	private Variation[] variations;
+	private double[] variationWeights;
+
 	// Seed and random number generator.
 	private final long initialSeed;
 	private final Random random;
@@ -68,6 +70,7 @@ public class GUI extends JComponent {
 	private Graphics2D graphics;
 	
 	// GUI components.
+	private LoadingPane loadingPane;
 	private JButton redrawButton;
 	private JProgressBar progressBar;
 	
@@ -76,8 +79,6 @@ public class GUI extends JComponent {
 	private FlameFunction[] functions;
 
 	private long numIter = 100000;
-	private Variation[] variations;
-	private double[] variationWeights;
 	private int zoom = 1;
 	private double gamma = 4;
 	private int[][] data;
@@ -110,6 +111,10 @@ public class GUI extends JComponent {
 		frame.getContentPane().setLayout(new BorderLayout());
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.getContentPane().add(this, BorderLayout.CENTER);
+		
+		// Create glass pane to overlay the frame during loading.
+		loadingPane = new LoadingPane();;
+		frame.setGlassPane(loadingPane);
 
 		// Create settings panel at the bottom.
 		JPanel mainPanel = new JPanel();
@@ -242,11 +247,17 @@ public class GUI extends JComponent {
 		frame.setMinimumSize(frame.getMinimumSize()); // http://stackoverflow.com/a/19507872/343486
 		frame.pack();
 		frame.setVisible(true);
+		
+		// Add the loading pane to disable use of the components until the initialization has finished.
+		loadingPane.setVisible(true);
 
 		// Re-initialize variations and functions until there is a result with more than 10 pixels.
 		while(render(true, true) < 10) {
 			initialize();
 		}
+		
+		// Remove the loading pane.
+		loadingPane.setVisible(false);
 	}
 	
 	/**
