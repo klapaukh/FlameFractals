@@ -113,7 +113,7 @@ public class GUI extends JComponent {
 		frame.getContentPane().add(this, BorderLayout.CENTER);
 		
 		// Create glass pane to overlay the frame during loading.
-		loadingPane = new LoadingPane();;
+		loadingPane = new LoadingPane();
 		frame.setGlassPane(loadingPane);
 
 		// Create settings panel at the bottom.
@@ -279,6 +279,9 @@ public class GUI extends JComponent {
 		
 		public Long call() throws InterruptedException {
 			long count = 0;
+			
+			// Create a deterministic RNG for the render.
+			Random rnd = new Random(initialSeed + 1);
 
 			// Set the image buffer to all black.
 			graphics.setColor(Color.BLACK);
@@ -308,17 +311,17 @@ public class GUI extends JComponent {
 				checkForInterrupted();
 				
 				double[] p = new double[] {
-					random.nextDouble(), random.nextDouble()
+						rnd.nextDouble(), rnd.nextDouble()
 				};
 				double[] newp = new double[2];
 				double[] totalp = new double[2];
 				double[] col = new double[] {
-					random.nextDouble(), random.nextDouble(), random.nextDouble()
+						rnd.nextDouble(), rnd.nextDouble(), rnd.nextDouble()
 				};
 				for (int i = 0; i < 20 && !recalculate; i++) {
 					checkForInterrupted();
-					FlameFunction f = functions[random.nextInt(numFunctions)];
-					applyAll(f, p, newp, totalp);
+					FlameFunction f = functions[rnd.nextInt(numFunctions)];
+					applyAll(f, p, newp, totalp, rnd);
 					col[0] = (col[0] + (f.color.getRed() / 255.0)) / 2.0;
 					col[1] = (col[1] + (f.color.getGreen() / 255.0)) / 2.0;
 					col[2] = (col[2] + (f.color.getBlue() / 255.0)) / 2.0;
@@ -333,8 +336,8 @@ public class GUI extends JComponent {
 						progressBar.setString("Estimated time remaining: " + remaining + " seconds.");
 					}
 					checkForInterrupted();
-					FlameFunction f = functions[random.nextInt(numFunctions)];
-					applyAll(f, p, newp, totalp);
+					FlameFunction f = functions[rnd.nextInt(numFunctions)];
+					applyAll(f, p, newp, totalp, rnd);
 					col[0] = (col[0] + (f.color.getRed() / 255.0)) / 2.0;
 					col[1] = (col[1] + (f.color.getGreen() / 255.0)) / 2.0;
 					col[2] = (col[2] + (f.color.getBlue() / 255.0)) / 2.0;
@@ -429,7 +432,7 @@ public class GUI extends JComponent {
 		g.drawImage(image, 0, 0, getWidth(), getHeight(), 0, 0, bufferWidth, bufferHeight, null);
 	}
 
-	public void applyAll(FlameFunction f, double[] p, double[] newp, double[] totalp) {
+	public void applyAll(FlameFunction f, double[] p, double[] newp, double[] totalp, Random rnd) {
 		newp[0] = f.coefficients[0] * p[0] + f.coefficients[1] * p[1] + f.coefficients[2];
 		newp[1] = f.coefficients[3] * p[0] + f.coefficients[4] * p[1] + f.coefficients[5];
 		p[0] = newp[0];
@@ -446,7 +449,7 @@ public class GUI extends JComponent {
 		for (int v = 0; v < variations.length; v++) {
 			if (Double.compare(variationWeights[v], 0) != 0) {
 				var = true;
-				variations[v].apply(p, newp, f.coefficients, r, theta, phi, random);
+				variations[v].apply(p, newp, f.coefficients, r, theta, phi, rnd);
 				totalp[0] += newp[0] * variationWeights[v];
 				totalp[1] += newp[1] * variationWeights[v];
 			}
