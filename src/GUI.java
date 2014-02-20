@@ -80,7 +80,7 @@ public class GUI extends JComponent {
 
 	private long numIter = 100000;
 	private int zoom = 1;
-	private double gamma = 4;
+	private double gamma = 2.2;
 	private int[][] data;
 	private double[][][] colors;
 	private int superSampleSize = 3;
@@ -171,11 +171,7 @@ public class GUI extends JComponent {
 
 		// Add slider to control the Gamma.
 		panel = new JPanel();
-		slider = new JSlider(1, 100, (int) (gamma * 10));
-		slider.setMajorTickSpacing(10);
-		slider.setMinorTickSpacing(1);
-		slider.setPaintTicks(true);
-		slider.setPaintLabels(true);
+		slider = new JSlider(1, 50, (int) (gamma * 10));
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
@@ -373,9 +369,9 @@ public class GUI extends JComponent {
 								float r = (float) (alpha * colors[x][y][0]);
 								float gr = (float) (alpha * colors[x][y][1]);
 								float b = (float) (alpha * colors[x][y][2]);
-								r = (float) Math.pow(r, gamma);
-								gr = (float) Math.pow(gr, gamma);
-								b = (float) Math.pow(b, gamma);
+								r = (float) Math.pow(r, 1.0/gamma);
+								gr = (float) Math.pow(gr, 1.0/gamma);
+								b = (float) Math.pow(b, 1.0/gamma);
 								r = Math.min(r, 1);
 								gr = Math.min(gr, 1);
 								b = Math.min(b, 1);
