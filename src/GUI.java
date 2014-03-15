@@ -49,7 +49,7 @@ import javax.swing.event.ChangeListener;
 public class GUI extends JComponent {
 
 	private static final long serialVersionUID = -8900010760721989010L;
-	
+
 	// Variations and weights.
 	private static final int NUM_VARIATIONS = 49;
 	private Variation[] variations;
@@ -58,22 +58,22 @@ public class GUI extends JComponent {
 	// Seed and random number generator.
 	private final long initialSeed;
 	private final Random random;
-	
+
 	// Current rendering task and executor.
 	private FutureTask<Long> renderTask;
 	private ExecutorService renderer;
-	
+
 	// Image buffer.
 	private int bufferWidth = 1024;
 	private int bufferHeight = 768;
 	private BufferedImage image;
 	private Graphics2D graphics;
-	
+
 	// GUI components.
 	private LoadingPane loadingPane;
 	private JButton redrawButton;
 	private JProgressBar progressBar;
-	
+
 	// Flame functions.
 	private int numFunctions = 6;
 	private FlameFunction[] functions;
@@ -89,29 +89,29 @@ public class GUI extends JComponent {
 		// Use the current time as a seed.
 		this(System.currentTimeMillis());
 	}
-	
+
 	public GUI(long seed) {
 		// Initialize the random number generator with the given seed.
 		initialSeed = seed;
 		random = new Random(seed);
 		System.out.println("[INIT] Initializing Chaos Games with seed " + initialSeed);
-		
+
 		// Initialize variations and functions.
 		initialize();
 
 		// Create image buffer to hold render result before drawing to screen.
 		image = new BufferedImage(bufferWidth, bufferHeight, BufferedImage.TYPE_INT_RGB);
 		graphics = image.createGraphics();
-		
+
 		// Create new executor to perform rendering in the background.
 		renderer = Executors.newFixedThreadPool(1);
-		
+
 		// Create GUI.
 		JFrame frame = new JFrame("Chaos Games - " + initialSeed);
 		frame.getContentPane().setLayout(new BorderLayout());
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.getContentPane().add(this, BorderLayout.CENTER);
-		
+
 		// Create glass pane to overlay the frame during loading.
 		loadingPane = new LoadingPane();
 		frame.setGlassPane(loadingPane);
@@ -119,7 +119,7 @@ public class GUI extends JComponent {
 		// Create settings panel at the bottom.
 		JPanel mainPanel = new JPanel();
 		mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.PAGE_AXIS));
-		
+
 		// Add progress bar.
 		progressBar = new JProgressBar(0, 1000);
 		progressBar.setStringPainted(true);
@@ -193,7 +193,7 @@ public class GUI extends JComponent {
 			}
 		});
 		mainPanel.add(redrawButton);
-		
+
 		// Add redraw button.
 		JButton reinitializeButton = new JButton("Reinitialize");
 		reinitializeButton.addActionListener(new ActionListener() {
@@ -243,7 +243,7 @@ public class GUI extends JComponent {
 		frame.setMinimumSize(frame.getMinimumSize()); // http://stackoverflow.com/a/19507872/343486
 		frame.pack();
 		frame.setVisible(true);
-		
+
 		// Add the loading pane to disable use of the components until the initialization has finished.
 		loadingPane.setVisible(true);
 
@@ -251,38 +251,39 @@ public class GUI extends JComponent {
 		while(render(true, true) < 10) {
 			initialize();
 		}
-		
+
 		// Remove the loading pane.
 		loadingPane.setVisible(false);
 	}
-	
+
 	/**
 	 * A task that calculates and renders the flame fractal with the current parameters.
 	 * The task may be interrupted if a new render is requested before the current one has finished.
 	 */
 	private class RenderTask implements Callable<Long> {
 		private boolean recalculate;
-		
+
 		public RenderTask(boolean recalculate) {
 			this.recalculate = recalculate;
 		}
-		
+
 		private void checkForInterrupted() throws InterruptedException {
 			if(Thread.currentThread().isInterrupted()) {
 				throw new InterruptedException();
 			}
 		}
-		
+
+		@Override
 		public Long call() throws InterruptedException {
 			long count = 0;
-			
+
 			// Create a deterministic RNG for the render.
 			Random rnd = new Random(initialSeed + 1);
 
 			// Set the image buffer to all black.
 			graphics.setColor(Color.BLACK);
 			graphics.fillRect(0, 0, bufferWidth, bufferHeight);
-			
+
 			// Reset the progress bar.
 			progressBar.setValue(0);
 			progressBar.setString("Preparing calculations...");
@@ -305,7 +306,7 @@ public class GUI extends JComponent {
 				}
 
 				checkForInterrupted();
-				
+
 				double[] p = new double[] {
 						rnd.nextDouble(), rnd.nextDouble()
 				};
@@ -352,7 +353,7 @@ public class GUI extends JComponent {
 			}
 
 			progressBar.setString("Rendering...");
-			
+
 			int ss = superSampleSize / 2, c = 0;
 			boolean draw;
 			for (int i = superSampleSize / 2; i < w; i += superSampleSize) {
@@ -397,7 +398,7 @@ public class GUI extends JComponent {
 			return count;
 		}
 	}
-	
+
 	private synchronized long render(boolean recalculate, boolean block) {
 		if(renderTask != null && !renderTask.isDone()) {
 			renderTask.cancel(true);
@@ -417,7 +418,7 @@ public class GUI extends JComponent {
 	public Dimension getPreferredSize() {
 		return new Dimension(bufferWidth, bufferHeight);
 	}
-	
+
 	@Override
 	public Dimension getMinimumSize() {
 		return new Dimension(320, 240);
@@ -471,7 +472,7 @@ public class GUI extends JComponent {
 		initializeVariations();
 		initializeFlameFunctions();
 	}
-	
+
 	private synchronized void initializeVariations() {
 //		// Create Sierpinski's gasket.
 //		variationWeights = new double[1];
@@ -551,7 +552,7 @@ public class GUI extends JComponent {
 		variations[47] = new Variation.Twintrian(variationWeights[47]);
 		variations[48] = new Variation.Cross();
 	}
-	
+
 	private void initializeFlameFunctions() {
 		// Initialize the flame functions.
 		functions = new FlameFunction[numFunctions];
@@ -566,7 +567,7 @@ public class GUI extends JComponent {
 			functions[i] = new FlameFunction(coefficients, postCoefficients, color);
 		}
 	}
-	
+
 	public static void main(String args[]) {
 		new GUI();
 	}

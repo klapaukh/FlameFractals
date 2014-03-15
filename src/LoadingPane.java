@@ -28,10 +28,10 @@ import javax.swing.JComponent;
 
 /**
  * A component to be used as the glass pane of a container.
- * 
+ *
  * Once made visible it draws a translucent overlay over the container and
  * prevents interaction with the container's components until it is made not visible.
- * 
+ *
  * @author Daniel Gibbs <daniel@danielgibbs.name>
  */
 public class LoadingPane extends JComponent implements MouseListener, FocusListener {
@@ -43,6 +43,7 @@ public class LoadingPane extends JComponent implements MouseListener, FocusListe
 		addFocusListener(this);
 	}
 
+	@Override
 	public void paintComponent(Graphics g) {
 		// Paint a grey translucent background.
 		g.setColor(new Color(1.0f, 1.0f, 1.0f, 0.5f));
@@ -54,7 +55,8 @@ public class LoadingPane extends JComponent implements MouseListener, FocusListe
 		g.setColor(Color.BLACK);
 		g.drawString(message, (getWidth() - metrics.stringWidth(message)) / 2, ((getHeight() - metrics.getHeight()) / 2) + metrics.getAscent());
 	}
-	
+
+	@Override
 	public void setVisible(boolean visible) {
 		super.setVisible(visible);
 		// Make sure the loading pane gets the focus.
@@ -62,16 +64,23 @@ public class LoadingPane extends JComponent implements MouseListener, FocusListe
 	    	requestFocusInWindow();
 	}
 
+	@Override
 	public void focusLost(FocusEvent e) {
 		// Make sure the loading pane keeps the focus.
 		if (isVisible())
 			requestFocusInWindow();
 	}
-	
+
+	@Override
 	public void focusGained(FocusEvent e) {}
+	@Override
 	public void mouseClicked(MouseEvent e) {}
+	@Override
 	public void mousePressed(MouseEvent e) {}
+	@Override
 	public void mouseReleased(MouseEvent e) {}
+	@Override
 	public void mouseEntered(MouseEvent e) {}
+	@Override
 	public void mouseExited(MouseEvent e) {}
 }
