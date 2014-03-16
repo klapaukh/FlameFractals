@@ -56,8 +56,8 @@ public class GUI extends JComponent {
 	private double[] variationWeights;
 
 	// Seed and random number generator.
-	private final long initialSeed;
-	private final Random random;
+	private long seed;
+	private Random random;
 
 	// Current rendering task and executor.
 	private FutureTask<Long> renderTask;
@@ -70,6 +70,7 @@ public class GUI extends JComponent {
 	private Graphics2D graphics;
 
 	// GUI components.
+	private JFrame frame;
 	private LoadingPane loadingPane;
 	private JButton redrawButton;
 	private JProgressBar progressBar;
@@ -91,13 +92,8 @@ public class GUI extends JComponent {
 	}
 
 	public GUI(long seed) {
-		// Initialize the random number generator with the given seed.
-		initialSeed = seed;
-		random = new Random(seed);
-		System.out.println("[INIT] Initializing Chaos Games with seed " + initialSeed);
-
 		// Initialize variations and functions.
-		initialize();
+		initialize(seed);
 
 		// Create image buffer to hold render result before drawing to screen.
 		image = new BufferedImage(bufferWidth, bufferHeight, BufferedImage.TYPE_INT_RGB);
@@ -107,7 +103,7 @@ public class GUI extends JComponent {
 		renderer = Executors.newFixedThreadPool(1);
 
 		// Create GUI.
-		JFrame frame = new JFrame("Chaos Games - " + initialSeed);
+		frame = new JFrame("Chaos Games - " + seed);
 		frame.getContentPane().setLayout(new BorderLayout());
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frame.getContentPane().add(this, BorderLayout.CENTER);
@@ -199,7 +195,7 @@ public class GUI extends JComponent {
 		reinitializeButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				initialize();
+				initialize(random.nextLong());
 				render(true, false);
 			}
 		});
@@ -249,7 +245,7 @@ public class GUI extends JComponent {
 
 		// Re-initialize variations and functions until there is a result with more than 10 pixels.
 		while(render(true, true) < 10) {
-			initialize();
+			initialize(random.nextLong());
 		}
 
 		// Remove the loading pane.
@@ -278,7 +274,7 @@ public class GUI extends JComponent {
 			long count = 0;
 
 			// Create a deterministic RNG for the render.
-			Random rnd = new Random(initialSeed + 1);
+			Random rnd = new Random(seed + 1);
 
 			// Set the image buffer to all black.
 			graphics.setColor(Color.BLACK);
@@ -467,8 +463,18 @@ public class GUI extends JComponent {
 	 * Initialize all the different variations with random parameters,
 	 * and generate normalized random weights for each variation.
 	 * Then initialize a random number of flame functions with random coefficients.
+	 *
+	 * @param seed The seed with which to initialize the random number generator.
 	 */
-	private synchronized void initialize() {
+	private synchronized void initialize(long seed) {
+		// Initialize the random number generator with the given seed.
+		this.seed = seed;
+		random = new Random(seed);
+		System.out.println("[INIT] Initializing Chaos Games with seed " + seed);
+		if (frame != null) {
+			frame.setTitle("Chaos Games - " + seed);
+		}
+
 		initializeVariations();
 		initializeFlameFunctions();
 	}
