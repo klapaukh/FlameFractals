@@ -50,6 +50,14 @@ public class GUI extends JComponent {
 
 	private static final long serialVersionUID = -8900010760721989010L;
 
+	// Parameter bounds.
+	private static final long MIN_ITERATIONS = 10000L; // 10^4
+	private static final long MAX_ITERATIONS = 10000000000L; // 10^10
+	private static final int MIN_ZOOM = 1;
+	private static final int MAX_ZOOM = 10;
+	private static final double MIN_GAMMA = 0.1;
+	private static final double MAX_GAMMA = 5.0;
+
 	// Variations and weights.
 	private static final int NUM_VARIATIONS = 49;
 	private Variation[] variations;
@@ -79,7 +87,7 @@ public class GUI extends JComponent {
 	private int numFunctions = 6;
 	private FlameFunction[] functions;
 
-	private long numIter = 100000;
+	private long numIterations = 100000L;
 	private int zoom = 1;
 	private double gamma = 2.2;
 	private int[][] data;
@@ -123,7 +131,7 @@ public class GUI extends JComponent {
 
 		// Add slider to control the number of iterations.
 		JPanel panel = new JPanel();
-		JSlider slider = new JSlider(4, 10, 5);
+		JSlider slider = new JSlider((int)Math.log10(MIN_ITERATIONS), (int)Math.log10(MAX_ITERATIONS), (int)Math.log10(numIterations));
 		slider.setMajorTickSpacing(1);
 		slider.setSnapToTicks(true);
 		slider.setPaintTicks(true);
@@ -132,8 +140,8 @@ public class GUI extends JComponent {
 			@Override
 			public void stateChanged(ChangeEvent e) {
 				long newNumIter = (long) Math.pow(10, ((JSlider) e.getSource()).getValue());
-				if(newNumIter != numIter) {
-					numIter = newNumIter;
+				if(newNumIter != numIterations) {
+					numIterations = newNumIter;
 					render(true, false);
 				}
 			}
@@ -145,7 +153,7 @@ public class GUI extends JComponent {
 
 		// Add slider to control the zoom level.
 		panel = new JPanel();
-		slider = new JSlider(1, 10, 1);
+		slider = new JSlider(MIN_ZOOM, MAX_ZOOM, zoom);
 		slider.setMajorTickSpacing(1);
 		slider.setSnapToTicks(true);
 		slider.setPaintTicks(true);
@@ -167,7 +175,7 @@ public class GUI extends JComponent {
 
 		// Add slider to control the Gamma.
 		panel = new JPanel();
-		slider = new JSlider(1, 50, (int) (gamma * 10));
+		slider = new JSlider((int)(MIN_GAMMA * 10), (int)(MAX_GAMMA * 10), (int)(gamma * 10));
 		slider.addChangeListener(new ChangeListener() {
 			@Override
 			public void stateChanged(ChangeEvent e) {
@@ -320,13 +328,13 @@ public class GUI extends JComponent {
 					col[2] = (col[2] + (f.color.getBlue() / 255.0)) / 2.0;
 				}
 				long startTime = System.currentTimeMillis();
-				int realZoom = 11 - zoom;
-				for (long i = 0; i < numIter && recalculate; i++) {
-					if(numIter % (numIter / 1000) == 0) {
-						progressBar.setValue((int)((i * 1000) / numIter));
+				int realZoom = (MAX_ZOOM + 1) - zoom;
+				for (long i = 0; i < numIterations && recalculate; i++) {
+					if(numIterations % (numIterations / 1000) == 0) {
+						progressBar.setValue((int)((i * 1000) / numIterations));
 						long soFar = System.currentTimeMillis() - startTime;
 						double perIteration = soFar / (double)i;
-						long remaining = (long)Math.ceil(perIteration * (numIter - i) / 1000);
+						long remaining = (long)Math.ceil(perIteration * (numIterations - i) / 1000);
 						progressBar.setString("Estimated time remaining: " + remaining + " seconds.");
 					}
 					checkForInterrupted();
