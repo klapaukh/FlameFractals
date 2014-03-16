@@ -320,6 +320,7 @@ public class GUI extends JComponent {
 					col[2] = (col[2] + (f.color.getBlue() / 255.0)) / 2.0;
 				}
 				long startTime = System.currentTimeMillis();
+				int realZoom = 11 - zoom;
 				for (long i = 0; i < numIter && recalculate; i++) {
 					if(numIter % (numIter / 1000) == 0) {
 						progressBar.setValue((int)((i * 1000) / numIter));
@@ -335,9 +336,9 @@ public class GUI extends JComponent {
 					col[1] = (col[1] + (f.color.getGreen() / 255.0)) / 2.0;
 					col[2] = (col[2] + (f.color.getBlue() / 255.0)) / 2.0;
 
-					if (!(p[0] > zoom || p[0] < -zoom || p[1] > zoom || p[1] < -zoom)) {
-						int x = (int) (p[0] * w / (zoom * 2) + w / 2);
-						int y = (int) (p[1] * h / (zoom * 2) + h / 2);
+					if (!(p[0] > realZoom || p[0] < -realZoom || p[1] > realZoom || p[1] < -realZoom)) {
+						int x = (int) (p[0] * w / (realZoom * 2) + w / 2);
+						int y = (int) (p[1] * h / (realZoom * 2) + h / 2);
 						data[x][y]++;
 						colors[x][y][0] += col[0];
 						colors[x][y][1] += col[1];
