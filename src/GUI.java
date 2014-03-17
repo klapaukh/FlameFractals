@@ -16,23 +16,27 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
+import java.text.DecimalFormat;
 import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 
-import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JFrame;
@@ -43,6 +47,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSlider;
 import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
+import javax.swing.border.EmptyBorder;
 import javax.swing.event.ChangeEvent;
 import javax.swing.event.ChangeListener;
 
@@ -110,107 +115,19 @@ public class GUI extends JComponent {
 		// Create new executor to perform rendering in the background.
 		renderer = Executors.newFixedThreadPool(1);
 
-		// Create GUI.
+		// Create frame and layout manager.
 		frame = new JFrame("Chaos Games - " + seed);
-		frame.getContentPane().setLayout(new BorderLayout());
 		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-		frame.getContentPane().add(this, BorderLayout.CENTER);
+		Container pane = frame.getContentPane();
+		pane.setLayout(new GridBagLayout());
 
 		// Create glass pane to overlay the frame during loading.
 		loadingPane = new LoadingPane();
 		frame.setGlassPane(loadingPane);
 
-		// Create settings panel at the bottom.
-		JPanel mainPanel = new JPanel();
-		mainPanel.setLayout(new BoxLayout(mainPanel, BoxLayout.PAGE_AXIS));
-
-		// Add progress bar.
-		progressBar = new JProgressBar(0, 1000);
-		progressBar.setStringPainted(true);
-		mainPanel.add(progressBar);
-
-		// Add slider to control the number of iterations.
-		JPanel panel = new JPanel();
-		JSlider slider = new JSlider((int)Math.log10(MIN_ITERATIONS), (int)Math.log10(MAX_ITERATIONS), (int)Math.log10(numIterations));
-		slider.setMajorTickSpacing(1);
-		slider.setSnapToTicks(true);
-		slider.setPaintTicks(true);
-		slider.setPaintLabels(true);
-		slider.addChangeListener(new ChangeListener() {
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				long newNumIter = (long) Math.pow(10, ((JSlider) e.getSource()).getValue());
-				if(newNumIter != numIterations) {
-					numIterations = newNumIter;
-					render(true, false);
-				}
-			}
-		});
-		panel.setLayout(new BorderLayout());
-		panel.add(slider, BorderLayout.CENTER);
-		panel.add(new JLabel("Iterations"), BorderLayout.WEST);
-		mainPanel.add(panel);
-
-		// Add slider to control the zoom level.
-		panel = new JPanel();
-		slider = new JSlider(MIN_ZOOM, MAX_ZOOM, zoom);
-		slider.setMajorTickSpacing(1);
-		slider.setSnapToTicks(true);
-		slider.setPaintTicks(true);
-		slider.setPaintLabels(true);
-		slider.addChangeListener(new ChangeListener() {
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				int newZoom = ((JSlider) e.getSource()).getValue();
-				if(newZoom != zoom) {
-					zoom = newZoom;
-					render(true, false);
-				}
-			}
-		});
-		panel.setLayout(new BorderLayout());
-		panel.add(slider, BorderLayout.CENTER);
-		panel.add(new JLabel("Zoom"), BorderLayout.WEST);
-		mainPanel.add(panel);
-
-		// Add slider to control the Gamma.
-		panel = new JPanel();
-		slider = new JSlider((int)(MIN_GAMMA * 10), (int)(MAX_GAMMA * 10), (int)(gamma * 10));
-		slider.addChangeListener(new ChangeListener() {
-			@Override
-			public void stateChanged(ChangeEvent e) {
-				gamma = ((JSlider) e.getSource()).getValue() / 10.0;
-				render(false, false);
-			}
-		});
-		panel.setLayout(new BorderLayout());
-		panel.add(slider, BorderLayout.CENTER);
-		panel.add(new JLabel("Gamma"), BorderLayout.WEST);
-		mainPanel.add(panel);
-
-		// Add redraw button.
-		redrawButton = new JButton("Redraw");
-		redrawButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				render(true, false);
-			}
-		});
-		mainPanel.add(redrawButton);
-
-		// Add redraw button.
-		JButton reinitializeButton = new JButton("Reinitialize");
-		reinitializeButton.addActionListener(new ActionListener() {
-			@Override
-			public void actionPerformed(ActionEvent e) {
-				initialize(random.nextLong());
-				render(true, false);
-			}
-		});
-		mainPanel.add(reinitializeButton);
-
-		// Add top panel to set the weights for each variation.
-		JPanel topPanel = new JPanel();
+		// Add a panel to set the weights for each variation.
+		JPanel variationsPanel = new JPanel(new GridLayout(0, 2, 5, 5));
+		variationsPanel.setBorder(new EmptyBorder(5, 5, 5, 5));
 		for (int i = 0; i < variations.length; i++) {
 			JLabel lab = new JLabel(variations[i].toString());
 			final JTextField t = new JTextField(4);
@@ -232,18 +149,201 @@ public class GUI extends JComponent {
 			});
 
 			t.setText(String.format("%.3f", variationWeights[i]));
-			topPanel.add(lab);
-			topPanel.add(t);
+			variationsPanel.add(lab);
+			variationsPanel.add(t);
 		}
 
-		// Put the top panel is an scroll pane.
-		JScrollPane scroll = new JScrollPane(topPanel);
-		scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_NEVER);
-		scroll.setPreferredSize(new Dimension(1024, 50));
+		// Put the variations panel in a scroll pane and add to the frame.
+		JScrollPane variationsScroll = new JScrollPane(variationsPanel);
+		variationsScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+		variationsScroll.setBorder(null);
+		variationsScroll.setMinimumSize(new Dimension(variationsPanel.getMinimumSize().width + variationsScroll.getVerticalScrollBar().getMinimumSize().width, 0));
+		GridBagConstraints variationsScrollConstraints = new GridBagConstraints();
+		variationsScrollConstraints.fill = GridBagConstraints.BOTH;
+		variationsScrollConstraints.anchor = GridBagConstraints.PAGE_START;
+		variationsScrollConstraints.gridx = 0;
+		variationsScrollConstraints.gridy = 0;
+		variationsScrollConstraints.gridheight = 2;
+		variationsScrollConstraints.weighty = 0.98;
+		pane.add(variationsScroll, variationsScrollConstraints);
 
-		// Add the top panel and main panel to the window and display it.
-		frame.getContentPane().add(scroll, BorderLayout.NORTH);
-		frame.getContentPane().add(mainPanel, BorderLayout.SOUTH);
+		// Add the visualization to the frame.
+		GridBagConstraints thisConstraints = new GridBagConstraints();
+		thisConstraints.fill = GridBagConstraints.BOTH;
+		thisConstraints.weightx = 1.0;
+		thisConstraints.weighty = 1.0;
+		thisConstraints.anchor = GridBagConstraints.CENTER;
+		thisConstraints.gridx = 1;
+		thisConstraints.gridy = 0;
+		pane.add(this, thisConstraints);
+
+		// Add progress bar to the frame.
+		progressBar = new JProgressBar(0, 1000);
+		progressBar.setStringPainted(true);
+		GridBagConstraints progressBarConstraints = new GridBagConstraints();
+		progressBarConstraints.fill = GridBagConstraints.HORIZONTAL;
+		progressBarConstraints.weightx = 1.0;
+		progressBarConstraints.anchor = GridBagConstraints.CENTER;
+		progressBarConstraints.gridx = 1;
+		progressBarConstraints.gridy = 1;
+		pane.add(progressBar, progressBarConstraints);
+
+		// Add the parameters panel to the frame.
+		JPanel parametersPanel = new JPanel(new GridBagLayout());
+		GridBagConstraints parametersPanelConstraints = new GridBagConstraints();
+		parametersPanelConstraints.fill = GridBagConstraints.HORIZONTAL;
+		parametersPanelConstraints.insets = new Insets(5, 5, 5, 5);
+		parametersPanelConstraints.weightx = 1.0;
+		parametersPanelConstraints.anchor = GridBagConstraints.CENTER;
+		parametersPanelConstraints.gridx = 1;
+		parametersPanelConstraints.gridy = 2;
+		parametersPanelConstraints.gridheight = 2;
+		pane.add(parametersPanel, parametersPanelConstraints);
+
+		// Add slider to control the number of iterations to the parameters panel.
+		GridBagConstraints numIterationsLabelConstraints = new GridBagConstraints();
+		numIterationsLabelConstraints.fill = GridBagConstraints.NONE;
+		numIterationsLabelConstraints.anchor = GridBagConstraints.LINE_START;
+		numIterationsLabelConstraints.gridx = 0;
+		numIterationsLabelConstraints.gridy = 0;
+		parametersPanel.add(new JLabel("<html><strong>Iterations:</strong></html>"), numIterationsLabelConstraints);
+		final JLabel numIterationsValueLabel = new JLabel(new DecimalFormat().format(numIterations));
+		// Allow room for the size of the label to grow.
+		numIterationsValueLabel.setPreferredSize(new Dimension(100, numIterationsValueLabel.getPreferredSize().height));
+		GridBagConstraints numIterationsValueLabelConstraints = new GridBagConstraints();
+		numIterationsValueLabelConstraints.fill = GridBagConstraints.NONE;
+		numIterationsValueLabelConstraints.anchor = GridBagConstraints.LINE_START;
+		numIterationsValueLabelConstraints.insets = new Insets(0, 10, 0, 5);
+		numIterationsValueLabelConstraints.gridx = 1;
+		numIterationsValueLabelConstraints.gridy = 0;
+		parametersPanel.add(numIterationsValueLabel, numIterationsValueLabelConstraints);
+		JSlider numIterationsSlider = new JSlider((int)Math.log10(MIN_ITERATIONS), (int)Math.log10(MAX_ITERATIONS), (int)Math.log10(numIterations));
+		numIterationsSlider.setMajorTickSpacing(1);
+		numIterationsSlider.setSnapToTicks(true);
+		numIterationsSlider.setPaintTicks(true);
+		numIterationsSlider.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				long newNumIter = (long) Math.pow(10, ((JSlider) e.getSource()).getValue());
+				if(newNumIter != numIterations) {
+					numIterations = newNumIter;
+					numIterationsValueLabel.setText(new DecimalFormat().format(numIterations));
+					render(true, false);
+				}
+			}
+		});
+		GridBagConstraints numIterationsSliderConstraints = new GridBagConstraints();
+		numIterationsSliderConstraints.fill = GridBagConstraints.HORIZONTAL;
+		numIterationsSliderConstraints.weightx = 1.0;
+		numIterationsSliderConstraints.anchor = GridBagConstraints.CENTER;
+		numIterationsSliderConstraints.gridx = 2;
+		numIterationsSliderConstraints.gridy = 0;
+		parametersPanel.add(numIterationsSlider, numIterationsSliderConstraints);
+
+		// Add slider to control the zoom level to the parameters panel.
+		GridBagConstraints zoomLabelConstraints = new GridBagConstraints();
+		zoomLabelConstraints.fill = GridBagConstraints.NONE;
+		zoomLabelConstraints.anchor = GridBagConstraints.LINE_START;
+		zoomLabelConstraints.gridx = 0;
+		zoomLabelConstraints.gridy = 1;
+		parametersPanel.add(new JLabel("<html><strong>Zoom level:</strong></html>"), zoomLabelConstraints);
+		final JLabel zoomValueLabel = new JLabel("" + zoom);
+		GridBagConstraints zoomValueLabelConstraints = new GridBagConstraints();
+		zoomValueLabelConstraints.fill = GridBagConstraints.NONE;
+		zoomValueLabelConstraints.anchor = GridBagConstraints.LINE_START;
+		zoomValueLabelConstraints.insets = new Insets(0, 10, 0, 5);
+		zoomValueLabelConstraints.gridx = 1;
+		zoomValueLabelConstraints.gridy = 1;
+		parametersPanel.add(zoomValueLabel, zoomValueLabelConstraints);
+		JSlider zoomSlider = new JSlider(MIN_ZOOM, MAX_ZOOM, zoom);
+		zoomSlider.setMajorTickSpacing(1);
+		zoomSlider.setSnapToTicks(true);
+		zoomSlider.setPaintTicks(true);
+		zoomSlider.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				int newZoom = ((JSlider) e.getSource()).getValue();
+				if(newZoom != zoom) {
+					zoom = newZoom;
+					zoomValueLabel.setText("" + zoom);
+					render(true, false);
+				}
+			}
+		});
+		GridBagConstraints zoomSliderConstraints = new GridBagConstraints();
+		zoomSliderConstraints.fill = GridBagConstraints.HORIZONTAL;
+		zoomSliderConstraints.weightx = 1.0;
+		zoomSliderConstraints.anchor = GridBagConstraints.CENTER;
+		zoomSliderConstraints.gridx = 2;
+		zoomSliderConstraints.gridy = 1;
+		parametersPanel.add(zoomSlider, zoomSliderConstraints);
+
+		// Add slider to control the gamma level to the parameters panel.
+		GridBagConstraints gammaLabelConstraints = new GridBagConstraints();
+		gammaLabelConstraints.fill = GridBagConstraints.NONE;
+		gammaLabelConstraints.anchor = GridBagConstraints.LINE_START;
+		gammaLabelConstraints.gridx = 0;
+		gammaLabelConstraints.gridy = 2;
+		parametersPanel.add(new JLabel("<html><strong>Gamma:</strong></html>"), gammaLabelConstraints);
+		final JLabel gammaValueLabel = new JLabel("" + gamma);
+		GridBagConstraints gammaValueLabelConstraints = new GridBagConstraints();
+		gammaValueLabelConstraints.fill = GridBagConstraints.NONE;
+		gammaValueLabelConstraints.anchor = GridBagConstraints.LINE_START;
+		gammaValueLabelConstraints.insets = new Insets(0, 10, 0, 5);
+		gammaValueLabelConstraints.gridx = 1;
+		gammaValueLabelConstraints.gridy = 2;
+		parametersPanel.add(gammaValueLabel, gammaValueLabelConstraints);
+		JSlider gammaSlider = new JSlider((int)(MIN_GAMMA * 10), (int)(MAX_GAMMA * 10), (int)(gamma * 10));
+		gammaSlider.addChangeListener(new ChangeListener() {
+			@Override
+			public void stateChanged(ChangeEvent e) {
+				gamma = ((JSlider) e.getSource()).getValue() / 10.0;
+				gammaValueLabel.setText("" + gamma);
+				render(false, false);
+			}
+		});
+		GridBagConstraints gammaSliderConstraints = new GridBagConstraints();
+		gammaSliderConstraints.fill = GridBagConstraints.HORIZONTAL;
+		gammaSliderConstraints.weightx = 1.0;
+		gammaSliderConstraints.anchor = GridBagConstraints.CENTER;
+		gammaSliderConstraints.gridx = 2;
+		gammaSliderConstraints.gridy = 2;
+		parametersPanel.add(gammaSlider, gammaSliderConstraints);
+
+		// Add redraw button to the frame.
+		redrawButton = new JButton("Redraw");
+		redrawButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				render(true, false);
+			}
+		});
+		GridBagConstraints redrawButtonConstraints = new GridBagConstraints();
+		redrawButtonConstraints.fill = GridBagConstraints.HORIZONTAL;
+		redrawButtonConstraints.anchor = GridBagConstraints.CENTER;
+		redrawButtonConstraints.gridx = 0;
+		redrawButtonConstraints.gridy = 2;
+		redrawButtonConstraints.weighty = 0.01;
+		pane.add(redrawButton, redrawButtonConstraints);
+
+		// Add reinitialize button to the frame.
+		JButton reinitializeButton = new JButton("Reinitialize");
+		reinitializeButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				initialize(random.nextLong());
+				render(true, false);
+			}
+		});
+		GridBagConstraints reinitializeButtonConstraints = new GridBagConstraints();
+		reinitializeButtonConstraints.fill = GridBagConstraints.HORIZONTAL;
+		reinitializeButtonConstraints.anchor = GridBagConstraints.CENTER;
+		reinitializeButtonConstraints.gridx = 0;
+		reinitializeButtonConstraints.gridy = 3;
+		reinitializeButtonConstraints.weighty = 0.01;
+		pane.add(reinitializeButton, reinitializeButtonConstraints);
+
+		// Set the minimum size of the frame and display it.
 		frame.setMinimumSize(frame.getMinimumSize()); // http://stackoverflow.com/a/19507872/343486
 		frame.pack();
 		frame.setVisible(true);
